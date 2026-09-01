@@ -63,7 +63,7 @@ class ChatCredits:
         self.state.root = ROOT
         self.state.bus = self.bus
         self.cast = CastBoard(ROOT, allow_alert_groups=False)
-        self.cast.set_style((config.get("credits") or {}).get("style_id") or "names")
+        self.cast.set_style((config.get("credits") or {}).get("style_id") or "movie")
         self.state.cast = self.cast
         load_theme(self.state)
         if os.environ.get("CREDITS_DEMO") == "1":

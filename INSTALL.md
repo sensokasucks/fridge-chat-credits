@@ -108,6 +108,8 @@ Add a **Webpage** (XSplit) or **Browser** (OBS) source:
 
 Turn **transparent background** on. Size it however you like.
 
+The roll is the **Studio** style by default: title cards, then crew jobs, then legal. On the control desk, **Movie style** lets you change the studio name, jobs, legal lines, and stinger without opening a file.
+
 The control desk is only for you. The overlay is what viewers see.
 
 ---

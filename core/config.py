@@ -69,9 +69,9 @@ DEFAULTS: dict[str, Any] = {
         "columns": 2,
         "speed_px_per_sec": 42,
         "duration_sec": 0,
-        "letterbox": False,
-        "grain": False,
-        "vignette": False,
+        "letterbox": True,
+        "grain": True,
+        "vignette": True,
         "gap_after_loop_sec": 2.5,
         "mode": "loop",
         "show_platform": True,
@@ -91,7 +91,7 @@ DEFAULTS: dict[str, Any] = {
         "row_gap_px": 10,
         "max_width_px": 920,
         "custom_font_url": "",
-        "style_id": "names",
+        "style_id": "movie",
     },
 }
 

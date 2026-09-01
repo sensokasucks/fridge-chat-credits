@@ -24,7 +24,7 @@ STYLE_NAMES = {"names", "movie"}
 
 DEFAULT_MOVIE: dict[str, Any] = {
     "id": "movie",
-    "label": "Movie",
+    "label": "Studio",
     "style": "movie",
     "studio": "Fridge Pictures",
     "mpaa": "Rated T for Toxic Chat",
