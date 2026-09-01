@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat Credits — Control</title>
+  <style>
+    :root {
+      --bg: #12110f;
+      --card: #1c1a17;
+      --ink: #f3eee4;
+      --muted: #9a9080;
+      --gold: #e8c36a;
+      --line: #2e2a24;
+      --kick: #53fc18;
+      --twitch: #bf94ff;
+      --youtube: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      padding: 18px 22px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 { font-size: 18px; margin: 0 0 4px; letter-spacing: .04em; }
+    header p { margin: 0; color: var(--muted); }
+    .preview-wrap {
+      margin: 16px 16px 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      height: min(42vh, 380px);
+      position: relative;
+    }
+    .preview-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000;
+    }
+    .preview-cap {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      z-index: 2;
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      pointer-events: none;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 280px 1fr 300px;
+      gap: 16px;
+      padding: 16px;
+    }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 0 0 12px; }
+    .stat { font-size: 42px; color: var(--gold); font-weight: 650; }
+    .plat { display: flex; justify-content: space-between; padding: 4px 0; color: var(--muted); }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+    button, select, input {
+      font: inherit;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: #26221c;
+      color: var(--ink);
+      padding: 7px 10px;
+    }
+    button {
+      cursor: pointer;
+      background: #3a3328;
+    }
+    button.primary { background: #6a5420; border-color: #8a6d2c; color: #fff6d8; }
+    button.danger { background: #4a2420; border-color: #6a3430; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 4px; }
+    input[type="text"], input[type="number"], select { width: 100%; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .list { max-height: 62vh; overflow: auto; }
+    .person {
+      display: flex; justify-content: space-between; gap: 8px;
+      padding: 6px 0; border-bottom: 1px solid var(--line);
+    }
+    .person b { font-weight: 600; }
+    .meta { color: var(--muted); font-size: 12px; }
+    code { color: var(--gold); font-size: 12px; }
+    a { color: var(--gold); }
+    .cfg {
+      margin: 0 16px 24px;
+    }
+    .cfg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .cfg .card h2 { margin-bottom: 8px; }
+    .dept { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; }
+    .dept-head { display: flex; gap: 8px; align-items: center; }
+    .dept-head input { flex: 1; }
+    textarea.block {
+      width: 100%; background: #26221c; color: var(--ink); border: 1px solid var(--line);
+      border-radius: 6px; padding: 8px; font: inherit; resize: vertical;
+    }
+    #movie-editor { margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Chat Credits</h1>
+    <p>Unique chatters this session · Webpage source
+      <code>/overlay/credits.html</code>
+    </p>
+  </header>
+  <div class="preview-wrap">
+    <div class="preview-cap">Live overlay — crawl starts from the bottom</div>
+    <iframe id="preview" title="Credits roll preview" src="/overlay/credits.html"></iframe>
+  </div>
+  <main>
+    <section class="card">
+      <h2>Session</h2>
+      <div class="stat" id="count">0</div>
+      <div id="plats"></div>
+      <div class="row">
+        <button class="primary" id="btn-roll">Roll credits (freeze list)</button>
+        <button id="btn-live">Live list</button>
+      </div>
+      <div class="row">
+        <button id="btn-loop">Loop</button>
+        <button id="btn-once">Play once</button>
+        <button id="btn-hold">Hold still</button>
+      </div>
+      <div class="row">
+        <button id="btn-pause">Pause / play</button>
+        <button class="danger" id="btn-reset">Reset session</button>
+      </div>
+      <p class="meta" style="margin-top:12px">
+        Adapters: <span id="adapters">…</span><br />
+        <a href="/overlay/credits.html" target="_blank">Open overlay</a> ·
+        <a href="/api/roster.csv">Export CSV</a>
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Look</h2>
+      <label>Title</label>
+      <input type="text" id="title" />
+      <label>Subtitle</label>
+      <input type="text" id="subtitle" />
+      <label>Footer</label>
+      <input type="text" id="footer" />
+      <div class="grid2">
+        <div>
+          <label>Columns</label>
+          <select id="columns">
+            <option>1</option><option>2</option><option>3</option>
+          </select>
+        </div>
+        <div>
+          <label>Sort</label>
+          <select id="sort">
+            <option value="first_seen">First seen</option>
+            <option value="name">Name</option>
+            <option value="messages">Most messages</option>
+            <option value="last_seen">Last seen</option>
+          </select>
+        </div>
+        <div>
+          <label>Speed (px/s)</label>
+          <input type="number" id="speed_px_per_sec" min="10" max="200" />
+        </div>
+        <div>
+          <label>Target time (sec, 0 = use speed)</label>
+          <input type="number" id="duration_sec" min="0" max="600" />
+        </div>
+        <div>
+          <label>Name size</label>
+          <input type="number" id="name_size_px" min="12" max="48" />
+        </div>
+        <div>
+          <label>Title color</label>
+          <input type="text" id="title_color" />
+        </div>
+        <div>
+          <label>Name color</label>
+          <input type="text" id="name_color" />
+        </div>
+      </div>
+      <label><input type="checkbox" id="group_by_platform" /> Group by platform</label>
+      <label><input type="checkbox" id="show_platform" /> Platform dots</label>
+      <label><input type="checkbox" id="show_message_count" /> Show message counts</label>
+      <label><input type="checkbox" id="highlight_mods" /> Highlight mods</label>
+      <label><input type="checkbox" id="letterbox" /> Letterbox</label>
+      <label><input type="checkbox" id="grain" /> Film grain</label>
+      <label><input type="checkbox" id="vignette" /> Vignette</label>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="btn-save">Save look</button>
+      </div>
+      <label>Test name</label>
+      <div class="row">
+        <input type="text" id="seed-name" placeholder="username" style="flex:1" />
+        <select id="seed-plat">
+          <option value="manual">manual</option>
+          <option value="twitch">twitch</option>
+          <option value="kick">kick</option>
+          <option value="youtube">youtube</option>
+        </select>
+        <button id="btn-seed">Add</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:14px 0" />
+      <h2>Movie style</h2>
+      <label>Style file</label>
+      <select id="cast-style"></select>
+      <p class="meta">Pick Names for a plain list, or Movie for the full roll. Job titles max 50 characters.</p>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" id="btn-cast-style">Use this style</button>
+      </div>
+      <div id="movie-editor">
+        <label>Studio</label>
+        <input type="text" id="mv-studio" maxlength="80" placeholder="Fridge Pictures" />
+        <label>MPAA line</label>
+        <input type="text" id="mv-mpaa" maxlength="80" />
+        <label>Location line</label>
+        <input type="text" id="mv-location" maxlength="120" />
+        <label>Overflow heading</label>
+        <input type="text" id="mv-overflow" maxlength="80" />
+        <div class="grid2">
+          <div>
+            <label>Starring count</label>
+            <input type="number" id="mv-top" min="0" max="30" />
+          </div>
+          <div>
+            <label>Card hold (sec)</label>
+            <input type="number" id="mv-card-hold" min="0.5" max="12" step="0.1" />
+          </div>
+          <div>
+            <label>End hold (sec)</label>
+            <input type="number" id="mv-end-hold" min="0" max="20" step="0.1" />
+          </div>
+          <div>
+            <label>Stinger hold (sec)</label>
+            <input type="number" id="mv-stinger-hold" min="0.5" max="12" step="0.1" />
+          </div>
+        </div>
+        <label><input type="checkbox" id="mv-assoc" /> “In association with” card</label>
+        <p class="meta" style="margin-top:10px">Opening cards</p>
+        <label><input type="checkbox" id="mv-open-mpaa" /> MPAA bumper</label>
+        <label><input type="checkbox" id="mv-open-studio" /> Studio production</label>
+        <label><input type="checkbox" id="mv-open-title" /> Title</label>
+        <label><input type="checkbox" id="mv-open-assoc" /> Association / location</label>
+        <label><input type="checkbox" id="mv-open-dir" /> Directed by (pinned job)</label>
+        <div class="grid2">
+          <div>
+            <label>Job match</label>
+            <input type="text" id="mv-dir-match" maxlength="50" />
+          </div>
+          <div>
+            <label>Card label</label>
+            <input type="text" id="mv-dir-label" maxlength="50" />
+          </div>
+        </div>
+        <label><input type="checkbox" id="mv-open-write" /> Written by (pinned job)</label>
+        <div class="grid2">
+          <div>
+            <label>Job match</label>
+            <input type="text" id="mv-write-match" maxlength="50" />
+          </div>
+          <div>
+            <label>Card label</label>
+            <input type="text" id="mv-write-label" maxlength="50" />
+          </div>
+        </div>
+        <label><input type="checkbox" id="mv-open-star" /> Starring card</label>
+        <label>Legal (one line each, {year} {studio} ok)</label>
+        <textarea class="block" id="mv-legal" rows="5"></textarea>
+        <p class="meta" style="margin-top:10px">Stinger</p>
+        <label><input type="checkbox" id="mv-stinger-on" /> Show stinger</label>
+        <label>Kicker</label>
+        <input type="text" id="mv-stinger-kicker" maxlength="80" />
+        <label>Line</label>
+        <input type="text" id="mv-stinger-line" maxlength="80" />
+        <p class="meta" style="margin-top:10px">Departments (jobs, one per line)</p>
+        <div id="mv-depts"></div>
+        <button type="button" id="mv-add-dept">Add department</button>
+        <p class="meta" style="margin-top:10px">Name groups</p>
+        <div id="mv-groups"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="btn-movie-save">Save movie style</button>
+        </div>
+        <span class="meta" id="mv-save-status"></span>
+      </div>
+      <label>Pin a name (stays across streams)</label>
+      <div class="row">
+        <input type="text" id="pin-name" placeholder="username" style="flex:1" />
+        <select id="pin-plat">
+          <option value="twitch">twitch</option>
+          <option value="kick">kick</option>
+          <option value="youtube">youtube</option>
+        </select>
+      </div>
+      <input type="text" id="pin-job" maxlength="50" placeholder="job title (50 chars)" />
+      <div class="row" style="margin-top:8px">
+        <button id="btn-pin">Pin</button>
+        <button id="btn-unpin">Clear pin</button>
+      </div>
+      <div class="list" id="pin-list"></div>
+    </section>
+
+    <section class="card">
+      <h2>Chatters</h2>
+      <div class="list" id="list"></div>
+    </section>
+  </main>
+
+  <div class="cfg-actions">
+    <h2 style="margin:0; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); flex:1">Config.yaml</h2>
+    <button class="primary" id="cfg-save">Save config</button>
+    <button id="cfg-reload">Reload</button>
+    <span class="meta" id="cfg-status"></span>
+  </div>
+  <p class="meta" style="margin:4px 16px 12px">
+    This is the standalone app’s own file — not Stream Core’s.
+    Changing Twitch / Kick / YouTube / ingest requires a restart of Chat Credits.
+    Look (title, colors, speed) saves immediately without a restart.
+  </p>
+  <section class="cfg">
+    <div class="cfg-grid">
+      <div class="card">
+        <h2>Twitch</h2>
+        <label><input type="checkbox" id="cfg-tw-enabled" /> Enabled (listens by itself, no token)</label>
+        <label>Channel</label>
+        <input type="text" id="cfg-tw-channel" placeholder="twitch.tv/THIS_PART" />
+      </div>
+      <div class="card">
+        <h2>Kick</h2>
+        <label><input type="checkbox" id="cfg-kick-enabled" /> Enabled (public chat socket)</label>
+        <label>Channel slug</label>
+        <input type="text" id="cfg-kick-slug" placeholder="kick.com/THIS_PART" />
+        <label>Chatroom id (optional)</label>
+        <input type="text" id="cfg-kick-chatroom" placeholder="only if lookup 403s" />
+      </div>
+      <div class="card">
+        <h2>YouTube</h2>
+        <label><input type="checkbox" id="cfg-yt-enabled" /> Enabled</label>
+        <label>API key</label>
+        <input type="text" id="cfg-yt-apikey" placeholder="AIza…" autocomplete="off" />
+        <label>Live video id</label>
+        <input type="text" id="cfg-yt-video" />
+      </div>
+      <div class="card">
+        <h2>Stream Core ingest</h2>
+        <p class="meta">Optional. Reuse Core’s chat instead of a second Kick socket. Core does not need to be running unless this is on.</p>
+        <label><input type="checkbox" id="cfg-ingest-enabled" /> Ingest from Stream Core</label>
+        <label>WebSocket URL</label>
+        <input type="text" id="cfg-ingest-url" placeholder="ws://127.0.0.1:3850/ws" />
+      </div>
+      <div class="card">
+        <h2>Roster filters</h2>
+        <label><input type="checkbox" id="cfg-ignore-own" /> Ignore own channel name</label>
+        <label>Min message length</label>
+        <input type="number" id="cfg-min-len" min="0" />
+        <label>Ignore usernames (one per line)</label>
+        <textarea id="cfg-ignore" rows="6" style="width:100%; background:#26221c; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit"></textarea>
+      </div>
+      <div class="card">
+        <h2>Server</h2>
+        <label>Host</label>
+        <input type="text" id="cfg-host" />
+        <label>Port</label>
+        <input type="number" id="cfg-port" min="1" max="65535" />
+        <label>Log level</label>
+        <select id="cfg-log">
+          <option>DEBUG</option><option>INFO</option><option>WARNING</option><option>ERROR</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const THEME_FIELDS = [
+      "title","subtitle","footer","columns","sort","speed_px_per_sec","duration_sec",
+      "name_size_px","title_color","name_color"
+    ];
+    const CHECKS = ["group_by_platform","show_platform","show_message_count","highlight_mods","letterbox","grain","vignette"];
+    let theme = {};
+    let play = {};
+    let lastConfig = {};
+
+    function fillTheme(t) {
+      theme = t;
+      for (const k of THEME_FIELDS) {
+        if ($(k) && t[k] != null) $(k).value = t[k];
+      }
+      for (const k of CHECKS) {
+        if ($(k)) $(k).checked = !!t[k];
+      }
+    }
+
+    function collectTheme() {
+      const body = {};
+      for (const k of THEME_FIELDS) {
+        let v = $(k).value;
+        if (["columns","speed_px_per_sec","duration_sec","name_size_px"].includes(k)) v = Number(v);
+        body[k] = v;
+      }
+      for (const k of CHECKS) body[k] = $(k).checked;
+      return body;
+    }
+
+    function renderRoster(r) {
+      $("count").textContent = r.count || 0;
+      const plats = r.by_platform || {};
+      $("plats").innerHTML = Object.keys(plats).sort().map((p) =>
+        `<div class="plat"><span><span class="dot" style="background:var(--${p}, #888)"></span>${p}</span><span>${plats[p]}</span></div>`
+      ).join("") || `<div class="meta">No chatters yet</div>`;
+      $("list").innerHTML = (r.chatters || []).map((c) =>
+        `<div class="person"><div><b>${esc(c.display_name)}</b>
+          <div class="meta">${c.platform}${c.is_mod ? " · mod" : ""} · ${c.messages} msg</div></div></div>`
+      ).join("");
+    }
+
+    function esc(s) {
+      return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+    }
+
+    async function post(url, body) {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      return r.json();
+    }
+
+    $("btn-save").onclick = async () => {
+      const body = collectTheme();
+      body.persist = true;
+      const r = await fetch("/api/theme", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      fillTheme(await r.json());
+    };
+    $("btn-roll").onclick = () => post("/api/play", { playing: true, mode: "loop", freeze: true, restart: true });
+    $("btn-live").onclick = () => post("/api/play", { freeze: false, playing: true });
+    $("btn-loop").onclick = () => post("/api/play", { mode: "loop", playing: true, restart: true });
+    $("btn-once").onclick = () => post("/api/play", { mode: "once", playing: true, freeze: true, restart: true });
+    $("btn-hold").onclick = () => post("/api/play", { mode: "hold", playing: true });
+    $("btn-pause").onclick = () => post("/api/play", { playing: play.playing === false });
+    $("btn-reset").onclick = async () => {
+      if (confirm("Clear every unique chatter for this session?")) {
+        await post("/api/session/reset", {});
+      }
+    };
+    $("btn-seed").onclick = () => post("/api/seed", {
+      username: $("seed-name").value,
+      platform: $("seed-plat").value,
+    });
+
+    function fillPins(list) {
+      const el = $("pin-list");
+      if (!el) return;
+      el.innerHTML = (list || []).map((p) =>
+        `<div class="person"><div><b>${esc(p.username)}</b>
+          <div class="meta">${esc(p.platform)} · ${esc(p.job)}</div></div></div>`
+      ).join("") || `<div class="meta">No pinned names</div>`;
+    }
+
+    const GROUP_DEFS = [
+      { id: "mods", source: "mods", title: "Moderation Unit" },
+      { id: "subs", source: "subs", title: "Season Regulars" },
+      { id: "top", source: "top", title: "Starring" },
+    ];
+    const GROUP_DEFS_CORE = [
+      { id: "raiders", source: "raiders", title: "The Raiding Party" },
+      { id: "followers", source: "followers", title: "New in Town" },
+      { id: "gifted", source: "gifted", title: "Gifted Subs" },
+    ];
+    let allowAlertGroups = false;
+    let currentStyle = {};
+
+    function groupCatalog() {
+      return allowAlertGroups ? GROUP_DEFS.concat(GROUP_DEFS_CORE) : GROUP_DEFS;
+    }
+
+    function renderDepts(depts) {
+      const wrap = $("mv-depts");
+      if (!wrap) return;
+      wrap.innerHTML = "";
+      (depts && depts.length ? depts : [{ title: "", jobs: [] }]).forEach((d) => {
+        wrap.appendChild(deptEl(d));
+      });
+    }
+
+    function deptEl(d) {
+      d = d || {};
+      const box = document.createElement("div");
+      box.className = "dept";
+      box.innerHTML = `<div class="dept-head">
+        <input type="text" class="dept-title" maxlength="50" placeholder="Department title" />
+        <button type="button" class="dept-del">Remove</button>
+      </div>
+      <label>Jobs (one per line)</label>
+      <textarea class="block dept-jobs" rows="4"></textarea>`;
+      box.querySelector(".dept-title").value = d.title || "";
+      box.querySelector(".dept-jobs").value = (d.jobs || []).join("\n");
+      box.querySelector(".dept-del").onclick = () => box.remove();
+      return box;
+    }
+
+    function renderGroups(groups) {
+      const wrap = $("mv-groups");
+      if (!wrap) return;
+      const have = {};
+      (groups || []).forEach((g) => { have[g.source] = g; });
+      wrap.innerHTML = groupCatalog().map((def) => {
+        const g = have[def.source];
+        const on = !!g;
+        const title = (g && g.title) || def.title;
+        return `<label><input type="checkbox" class="grp-on" data-source="${esc(def.source)}" data-id="${esc(def.id)}" ${on ? "checked" : ""} />
+          <input type="text" class="grp-title" data-source="${esc(def.source)}" maxlength="50" value="${esc(title)}" /></label>`;
+      }).join("");
+    }
+
+    function openingHas(opening, type, match) {
+      return (opening || []).some((s) => s.type === type && (!match || (s.match || "") === match));
+    }
+
+    function openingJob(opening, fallbackMatch) {
+      const hit = (opening || []).find((s) => s.type === "job" && (s.match || "").toLowerCase() === fallbackMatch.toLowerCase())
+        || (opening || []).find((s) => s.type === "job" && !(s.match || "").toLowerCase().includes("show") && fallbackMatch === "Director")
+        || (opening || []).find((s) => s.type === "job");
+      return hit || {};
+    }
+
+    function fillMovieStyle(style) {
+      currentStyle = style || {};
+      const movie = (currentStyle.style || currentStyle.id) === "movie";
+      if ($("movie-editor")) $("movie-editor").style.display = movie || ($("cast-style") && $("cast-style").value === "movie") ? "" : "none";
+      if (!movie && ($("cast-style") && $("cast-style").value !== "movie")) return;
+      $("mv-studio").value = currentStyle.studio || "Fridge Pictures";
+      $("mv-mpaa").value = currentStyle.mpaa || "";
+      $("mv-location").value = currentStyle.location || "";
+      $("mv-overflow").value = currentStyle.overflow || "Additional Voices";
+      $("mv-top").value = currentStyle.top_talkers ?? 5;
+      $("mv-card-hold").value = currentStyle.card_hold_sec ?? 2.8;
+      $("mv-end-hold").value = currentStyle.end_hold_sec ?? 4;
+      $("mv-assoc").checked = currentStyle.in_association !== false;
+      const opening = currentStyle.opening || [];
+      $("mv-open-mpaa").checked = openingHas(opening, "mpaa") || !opening.length;
+      $("mv-open-studio").checked = openingHas(opening, "studio") || !opening.length;
+      $("mv-open-title").checked = openingHas(opening, "title") || !opening.length;
+      $("mv-open-assoc").checked = openingHas(opening, "association") || !opening.length;
+      $("mv-open-star").checked = openingHas(opening, "starring") || !opening.length;
+      const jobs = opening.filter((s) => s.type === "job");
+      const dir = jobs[0] || { match: "Director", label: "Directed by" };
+      const wr = jobs[1] || { match: "Showrunner", label: "Written by" };
+      $("mv-open-dir").checked = !!jobs[0] || !opening.length;
+      $("mv-open-write").checked = !!jobs[1] || !opening.length;
+      $("mv-dir-match").value = dir.match || "Director";
+      $("mv-dir-label").value = dir.label || "Directed by";
+      $("mv-write-match").value = wr.match || "Showrunner";
+      $("mv-write-label").value = wr.label || "Written by";
+      $("mv-legal").value = (currentStyle.legal || []).join("\n");
+      const st = currentStyle.stinger || {};
+      $("mv-stinger-on").checked = st.enabled !== false;
+      $("mv-stinger-kicker").value = st.kicker || "And also…";
+      $("mv-stinger-line").value = st.line || "the lurkers";
+      $("mv-stinger-hold").value = st.hold_sec ?? 4;
+      renderDepts(currentStyle.departments);
+      renderGroups(currentStyle.groups);
+    }
+
+    function collectMovieStyle() {
+      const opening = [];
+      if ($("mv-open-mpaa").checked) opening.push({ type: "mpaa" });
+      if ($("mv-open-studio").checked) opening.push({ type: "studio" });
+      if ($("mv-open-title").checked) opening.push({ type: "title" });
+      if ($("mv-open-assoc").checked) opening.push({ type: "association" });
+      if ($("mv-open-dir").checked) opening.push({ type: "job", match: $("mv-dir-match").value, label: $("mv-dir-label").value });
+      if ($("mv-open-write").checked) opening.push({ type: "job", match: $("mv-write-match").value, label: $("mv-write-label").value });
+      if ($("mv-open-star").checked) opening.push({ type: "starring" });
+      const departments = [...document.querySelectorAll("#mv-depts .dept")].map((box) => ({
+        id: (box.querySelector(".dept-title").value || "crew").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        title: box.querySelector(".dept-title").value,
+        jobs: lines(box.querySelector(".dept-jobs").value),
+      })).filter((d) => d.title || d.jobs.length);
+      const groups = [];
+      document.querySelectorAll("#mv-groups .grp-on").forEach((cb) => {
+        if (!cb.checked) return;
+        const src = cb.getAttribute("data-source");
+        const titleEl = document.querySelector(`#mv-groups .grp-title[data-source="${src}"]`);
+        groups.push({
+          id: cb.getAttribute("data-id") || src,
+          source: src,
+          title: (titleEl && titleEl.value) || src,
+        });
+      });
+      return {
+        id: ($("cast-style") && $("cast-style").value === "names") ? "movie" : ($("cast-style").value || "movie"),
+        label: "Movie",
+        style: "movie",
+        studio: $("mv-studio").value,
+        mpaa: $("mv-mpaa").value,
+        location: $("mv-location").value,
+        overflow: $("mv-overflow").value,
+        top_talkers: Number($("mv-top").value) || 5,
+        card_hold_sec: Number($("mv-card-hold").value) || 2.8,
+        end_hold_sec: Number($("mv-end-hold").value) || 4,
+        in_association: $("mv-assoc").checked,
+        letterbox: $("letterbox") ? $("letterbox").checked : true,
+        grain: $("grain") ? $("grain").checked : true,
+        vignette: $("vignette") ? $("vignette").checked : true,
+        legal: lines($("mv-legal").value),
+        opening,
+        stinger: {
+          enabled: $("mv-stinger-on").checked,
+          kicker: $("mv-stinger-kicker").value,
+          line: $("mv-stinger-line").value,
+          hold_sec: Number($("mv-stinger-hold").value) || 4,
+        },
+        departments,
+        groups,
+      };
+    }
+
+    async function loadCast() {
+      try {
+        const data = await fetch("/api/cast").then((x) => x.json());
+        allowAlertGroups = !!data.allow_alert_groups;
+        const sel = $("cast-style");
+        if (sel) {
+          sel.innerHTML = (data.styles || []).map((s) =>
+            `<option value="${esc(s.id)}" ${s.id === data.style_id ? "selected" : ""}>${esc(s.label)} (${esc(s.style)})</option>`
+          ).join("");
+        }
+        fillPins(data.overrides || []);
+        fillMovieStyle(data.style || {});
+      } catch (e) { /* ignore */ }
+    }
+    if ($("btn-cast-style")) {
+      $("btn-cast-style").onclick = async () => {
+        await fetch("/api/cast/style", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ style_id: $("cast-style").value }),
+        });
+        loadCast();
+      };
+    }
+    if ($("cast-style")) {
+      $("cast-style").onchange = () => {
+        $("movie-editor").style.display = $("cast-style").value === "names" ? "none" : "";
+      };
+    }
+    if ($("mv-add-dept")) {
+      $("mv-add-dept").onclick = () => $("mv-depts").appendChild(deptEl({ title: "", jobs: [] }));
+    }
+    if ($("btn-movie-save")) {
+      $("btn-movie-save").onclick = async () => {
+        const status = $("mv-save-status");
+        try {
+          const res = await fetch("/api/cast/file", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(collectMovieStyle()),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "save failed");
+          status.textContent = "Saved";
+          loadCast();
+        } catch (e) {
+          status.textContent = String(e.message || e);
+        }
+      };
+    }
+    if ($("btn-pin")) {
+      $("btn-pin").onclick = async () => {
+        const data = await post("/api/cast/pin", {
+          username: $("pin-name").value,
+          platform: $("pin-plat").value,
+          job: $("pin-job").value,
+        });
+        fillPins(data.overrides || []);
+      };
+    }
+    if ($("btn-unpin")) {
+      $("btn-unpin").onclick = async () => {
+        const data = await post("/api/cast/pin", {
+          username: $("pin-name").value,
+          platform: $("pin-plat").value,
+          clear: true,
+        });
+        fillPins(data.overrides || []);
+      };
+    }
+
+    function lines(s) {
+      return String(s || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    }
+
+    function fillConfig(cfg) {
+      lastConfig = cfg || {};
+      const tw = cfg.twitch || {};
+      const k = cfg.kick || {};
+      const yt = cfg.youtube || {};
+      const ing = (cfg.ingest || {}).stream_core || {};
+      const r = cfg.roster || {};
+      const app = cfg.app || {};
+      $("cfg-tw-enabled").checked = !!tw.enabled;
+      $("cfg-tw-channel").value = tw.channel || "";
+      $("cfg-kick-enabled").checked = !!k.enabled;
+      $("cfg-kick-slug").value = k.channel_slug || "";
+      $("cfg-kick-chatroom").value = k.chatroom_id != null && k.chatroom_id !== "" ? String(k.chatroom_id) : "";
+      $("cfg-yt-enabled").checked = !!yt.enabled;
+      $("cfg-yt-apikey").value = yt.api_key || "";
+      $("cfg-yt-video").value = yt.video_id || "";
+      $("cfg-ingest-enabled").checked = !!ing.enabled;
+      $("cfg-ingest-url").value = ing.ws_url || "ws://127.0.0.1:3850/ws";
+      $("cfg-ignore-own").checked = r.ignore_own_channel !== false;
+      $("cfg-min-len").value = r.min_message_length ?? 1;
+      $("cfg-ignore").value = (r.ignore_usernames || []).join("\n");
+      $("cfg-host").value = app.host || "127.0.0.1";
+      $("cfg-port").value = app.port ?? 3854;
+      $("cfg-log").value = (app.log_level || "INFO").toUpperCase();
+    }
+
+    function collectConfig() {
+      const chatroom = $("cfg-kick-chatroom").value.trim();
+      const kick = {
+        enabled: $("cfg-kick-enabled").checked,
+        channel_slug: $("cfg-kick-slug").value.trim(),
+      };
+      if (chatroom) {
+        const n = Number(chatroom);
+        kick.chatroom_id = Number.isFinite(n) ? n : chatroom;
+      }
+      return {
+        ...(lastConfig || {}),
+        app: {
+          ...(lastConfig.app || {}),
+          host: $("cfg-host").value.trim() || "127.0.0.1",
+          port: Number($("cfg-port").value) || 3854,
+          log_level: $("cfg-log").value || "INFO",
+        },
+        twitch: {
+          enabled: $("cfg-tw-enabled").checked,
+          channel: $("cfg-tw-channel").value.trim().replace(/^#/, ""),
+        },
+        kick,
+        youtube: {
+          ...(lastConfig.youtube || {}),
+          enabled: $("cfg-yt-enabled").checked,
+          api_key: $("cfg-yt-apikey").value.trim(),
+          video_id: $("cfg-yt-video").value.trim(),
+        },
+        ingest: {
+          stream_core: {
+            enabled: $("cfg-ingest-enabled").checked,
+            ws_url: $("cfg-ingest-url").value.trim() || "ws://127.0.0.1:3850/ws",
+          },
+        },
+        roster: {
+          ignore_own_channel: $("cfg-ignore-own").checked,
+          min_message_length: Number($("cfg-min-len").value) || 1,
+          ignore_usernames: lines($("cfg-ignore").value),
+        },
+        credits: { ...(lastConfig.credits || {}), ...collectTheme() },
+      };
+    }
+
+    async function loadConfig() {
+      try {
+        const data = await fetch("/api/config").then((x) => x.json());
+        fillConfig(data.config || {});
+        $("cfg-status").textContent = "Loaded";
+      } catch (e) {
+        $("cfg-status").textContent = String(e.message || e);
+      }
+    }
+
+    $("cfg-reload").onclick = () => loadConfig();
+    $("cfg-save").onclick = async () => {
+      try {
+        const res = await fetch("/api/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config: collectConfig() }),
+        });
+        const data = await res.json();
+        $("cfg-status").textContent = data.message || "Saved";
+      } catch (e) {
+        $("cfg-status").textContent = String(e.message || e);
+      }
+    };
+
+    async function boot() {
+      const [t, r, p, h] = await Promise.all([
+        fetch("/api/theme").then((x) => x.json()),
+        fetch("/api/roster").then((x) => x.json()),
+        fetch("/api/play").then((x) => x.json()),
+        fetch("/api/health").then((x) => x.json()),
+      ]);
+      fillTheme(t);
+      renderRoster(r);
+      play = p;
+      $("adapters").textContent = (h.adapters || []).join(", ") || "none enabled";
+      loadConfig();
+      loadCast();
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/ws`);
+      ws.onmessage = (ev) => {
+        let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+        if (msg.type === "theme") fillTheme(msg.data);
+        if (msg.type === "roster") renderRoster(msg.data);
+        if (msg.type === "play") play = msg.data;
+      };
+      ws.onclose = () => setTimeout(boot, 2500);
+    }
+    boot();
+  </script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+{
+  "id": "movie",
+  "label": "Movie",
+  "style": "movie",
+  "studio": "Fridge Pictures",
+  "mpaa": "Rated T for Toxic Chat",
+  "overflow": "Additional Voices",
+  "top_talkers": 5,
+  "card_hold_sec": 2.8,
+  "end_hold_sec": 4.0,
+  "letterbox": true,
+  "grain": true,
+  "vignette": true,
+  "in_association": true,
+  "location": "Filmed entirely on location",
+  "opening": [
+    {"type": "mpaa"},
+    {"type": "studio"},
+    {"type": "title"},
+    {"type": "association"},
+    {"type": "job", "match": "Director", "label": "Directed by"},
+    {"type": "job", "match": "Showrunner", "label": "Written by"},
+    {"type": "starring"}
+  ],
+  "legal": [
+    "© {year} {studio}",
+    "No chatters were banned in the making of this stream",
+    "Catering by the fridge",
+    "Soundtrack: whatever was already playing",
+    "Stunts performed by the raiding party"
+  ],
+  "stinger": {
+    "enabled": true,
+    "kicker": "And also…",
+    "line": "the lurkers",
+    "hold_sec": 4.0
+  },
+  "departments": [
+    {
+      "id": "production",
+      "title": "Production",
+      "jobs": ["Showrunner", "Director", "Producer", "1st AD", "Script Supervisor"]
+    },
+    {
+      "id": "camera",
+      "title": "Camera",
+      "jobs": ["Director of Photography", "Camera Operator", "Key Grip", "Best Boy Grip", "Gaffer"]
+    },
+    {
+      "id": "sound",
+      "title": "Sound",
+      "jobs": ["Sound Mixer", "Boom Operator", "Foley Artist", "Chat Whisperer"]
+    },
+    {
+      "id": "chaos",
+      "title": "Department of Chaos",
+      "jobs": [
+        "Emotional Support Chat",
+        "Official First-er",
+        "Lurker Liaison",
+        "Raid Hype Captain",
+        "Bit Accountant",
+        "Craft Services"
+      ]
+    }
+  ],
+  "groups": [
+    {"id": "mods", "title": "Moderation Unit", "source": "mods"},
+    {"id": "subs", "title": "Season Regulars", "source": "subs"},
+    {"id": "top", "title": "Starring", "source": "top"}
+  ]
+}
