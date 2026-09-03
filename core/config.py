@@ -74,6 +74,7 @@ DEFAULTS: dict[str, Any] = {
         "vignette": True,
         "gap_after_loop_sec": 2.5,
         "mode": "loop",
+        "clear_when_done": False,
         "show_platform": True,
         "show_message_count": False,
         "highlight_mods": True,

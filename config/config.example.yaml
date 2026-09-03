@@ -63,7 +63,8 @@ credits:
   grain: true
   vignette: true
   gap_after_loop_sec: 2.5
-  mode: "loop"                       # loop | once | hold
+  mode: "loop"                       # loop | once | hold | clear
+  clear_when_done: false             # Play once then blank the overlay
   show_platform: true
   show_message_count: false
   highlight_mods: true

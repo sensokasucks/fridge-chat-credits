@@ -225,7 +225,7 @@ def create_app(state: AppState) -> FastAPI:
     async def set_play(body: dict[str, Any]):
         if "playing" in body:
             state.play["playing"] = bool(body["playing"])
-        if "mode" in body and body["mode"] in ("loop", "once", "hold"):
+        if "mode" in body and body["mode"] in ("loop", "once", "hold", "clear"):
             state.play["mode"] = body["mode"]
             state.theme["mode"] = body["mode"]
         if "freeze" in body:
