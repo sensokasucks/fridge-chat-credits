@@ -47,8 +47,10 @@ If it says Python is not recognized, run the Python installer again and tick **A
 
 1. Open [https://github.com/sensokasucks/fridge-chat-credits](https://github.com/sensokasucks/fridge-chat-credits)
 2. Click the green **Code** button → **Download ZIP**
-3. Unzip it somewhere easy, for example `C:\FridgeCredits`
-4. Open that unzipped folder. You should see `install.bat` and `start.bat` inside it.
+3. Unzip it somewhere easy, for example `C:\ChatCredits`
+4. Open that unzipped folder. You should see `INSTALL.md`, `install.bat`, and `start.bat`.
+
+If you already have the **Fridge Workshop** monorepo (`flavr-leftovers`), Chat Credits lives in the `fridge-chat-credits` folder there — skip to Step 3 and use **INSTALL Chat Credits.bat** from the workshop root, or `install.bat` inside this folder.
 
 ---
 
@@ -108,8 +110,6 @@ Add a **Webpage** (XSplit) or **Browser** (OBS) source:
 
 Turn **transparent background** on. Size it however you like.
 
-The roll is the **Studio** style by default: title cards, then crew jobs, then legal. On the control desk, **Movie style** lets you change the studio name, jobs, legal lines, and stinger without opening a file.
-
 The control desk is only for you. The overlay is what viewers see.
 
 ---
@@ -133,7 +133,7 @@ Add a test name with **Add** if you want to preview before you go live.
 
 You already installed. Only do this:
 
-1. Double-click **start.bat**
+1. Double-click **`start.bat`**
 2. If you want a fresh name list, click **Reset session** on the control desk.
 
 ---
@@ -143,7 +143,7 @@ You already installed. Only do this:
 | What you see | What to do |
 |--------------|------------|
 | `Python was not found` | Reinstall Python and tick **Add python.exe to PATH**. Restart the PC if it still fails. |
-| `Virtual environment not found` | Run **INSTALL Chat Credits.bat** once. |
+| `Virtual environment not found` | Run **install.bat** once. |
 | Control desk will not load | Make sure the black START window is still open. |
 | Overlay is black / empty | That is normal until names exist. Add a test name, or wait for chat. |
 | Names are not appearing | Platforms must be **enabled**, channel spelled right, then **restart** Chat Credits after saving. |

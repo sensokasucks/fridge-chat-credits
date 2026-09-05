@@ -2,9 +2,6 @@
 
 Styles live in config/cast/*.json. Pins live in data/cast_overrides.json
 and survive session reset. Job titles cap at 50 characters.
-
-Movie sequence (overlay):
-  hold cards → crawl (starring / crew / groups / thanks / legal) → end hold → stinger
 """
 
 from __future__ import annotations
@@ -13,7 +10,6 @@ import json
 import logging
 import random
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -24,41 +20,10 @@ STYLE_NAMES = {"names", "movie"}
 
 DEFAULT_MOVIE: dict[str, Any] = {
     "id": "movie",
-    "label": "Studio",
+    "label": "Movie",
     "style": "movie",
-    "studio": "Fridge Pictures",
-    "mpaa": "Rated T for Toxic Chat",
     "overflow": "Additional Voices",
     "top_talkers": 5,
-    "card_hold_sec": 2.8,
-    "end_hold_sec": 4.0,
-    "letterbox": True,
-    "grain": True,
-    "vignette": True,
-    "in_association": True,
-    "location": "Filmed entirely on location",
-    "opening": [
-        {"type": "mpaa"},
-        {"type": "studio"},
-        {"type": "title"},
-        {"type": "association"},
-        {"type": "job", "match": "Director", "label": "Directed by"},
-        {"type": "job", "match": "Showrunner", "label": "Written by"},
-        {"type": "starring"},
-    ],
-    "legal": [
-        "© {year} {studio}",
-        "No chatters were banned in the making of this stream",
-        "Catering by the fridge",
-        "Soundtrack: whatever was already playing",
-        "Stunts performed by the raiding party",
-    ],
-    "stinger": {
-        "enabled": True,
-        "kicker": "And also\u2026",
-        "line": "the lurkers",
-        "hold_sec": 4.0,
-    },
     "departments": [
         {
             "id": "production",
@@ -112,12 +77,6 @@ DEFAULT_MOVIE: dict[str, Any] = {
     ],
 }
 
-CORE_EXTRA_GROUPS = [
-    {"id": "raiders", "title": "The Raiding Party", "source": "raiders"},
-    {"id": "followers", "title": "New in Town", "source": "followers"},
-    {"id": "gifted", "title": "Gifted Subs", "source": "gifted"},
-]
-
 
 def clamp_job(title: str) -> str:
     text = re.sub(r"\s+", " ", str(title or "")).strip()
@@ -146,10 +105,6 @@ def parse_identity(raw: str, default_platform: str = "") -> tuple[str, str]:
     return (default_platform or "").lower(), s.lower().strip()
 
 
-def _fill(text: str, studio: str, year: str) -> str:
-    return str(text or "").replace("{studio}", studio).replace("{year}", year)
-
-
 class CastBoard:
     def __init__(self, root: Path, *, allow_alert_groups: bool = False):
         self.root = root
@@ -170,10 +125,7 @@ class CastBoard:
         self.styles_dir.mkdir(parents=True, exist_ok=True)
         movie_path = self.styles_dir / "movie.json"
         if not movie_path.exists():
-            payload = dict(DEFAULT_MOVIE)
-            if self.allow_alert_groups:
-                payload["groups"] = list(DEFAULT_MOVIE["groups"]) + list(CORE_EXTRA_GROUPS)
-            movie_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            movie_path.write_text(json.dumps(DEFAULT_MOVIE, indent=2), encoding="utf-8")
         found: dict[str, dict] = {"names": {"id": "names", "label": "Names", "style": "names"}}
         for path in sorted(self.styles_dir.glob("*.json")):
             try:
@@ -271,55 +223,6 @@ class CastBoard:
             })
         payload["groups"] = groups
         payload["overflow"] = str(payload.get("overflow") or "Additional Voices")[:80]
-        payload["studio"] = str(payload.get("studio") or "Fridge Pictures")[:80]
-        payload["mpaa"] = str(payload.get("mpaa") or "")[:80]
-        payload["location"] = str(payload.get("location") or "")[:120]
-        payload["in_association"] = bool(payload.get("in_association", True))
-        payload["letterbox"] = bool(payload.get("letterbox", True))
-        payload["grain"] = bool(payload.get("grain", True))
-        payload["vignette"] = bool(payload.get("vignette", True))
-        try:
-            payload["top_talkers"] = max(0, min(30, int(payload.get("top_talkers") or 5)))
-        except (TypeError, ValueError):
-            payload["top_talkers"] = 5
-        try:
-            payload["card_hold_sec"] = max(0.5, min(12.0, float(payload.get("card_hold_sec") or 2.8)))
-        except (TypeError, ValueError):
-            payload["card_hold_sec"] = 2.8
-        try:
-            payload["end_hold_sec"] = max(0.0, min(20.0, float(payload.get("end_hold_sec") or 4)))
-        except (TypeError, ValueError):
-            payload["end_hold_sec"] = 4.0
-        legal = []
-        for line in payload.get("legal") or []:
-            text = str(line or "").strip()
-            if text:
-                legal.append(text[:160])
-        payload["legal"] = legal
-        opening = []
-        for spec in payload.get("opening") or []:
-            if not isinstance(spec, dict):
-                continue
-            kind = str(spec.get("type") or "").lower()
-            if kind not in ("mpaa", "studio", "title", "association", "job", "starring"):
-                continue
-            item = {"type": kind}
-            if kind == "job":
-                item["match"] = clamp_job(spec.get("match") or "")
-                item["label"] = str(spec.get("label") or "")[:50]
-            opening.append(item)
-        payload["opening"] = opening
-        st = payload.get("stinger") if isinstance(payload.get("stinger"), dict) else {}
-        try:
-            shold = max(0.5, min(12.0, float(st.get("hold_sec") or 4)))
-        except (TypeError, ValueError):
-            shold = 4.0
-        payload["stinger"] = {
-            "enabled": bool(st.get("enabled", True)),
-            "kicker": str(st.get("kicker") or "And also\u2026")[:80],
-            "line": str(st.get("line") or "the lurkers")[:80],
-            "hold_sec": shold,
-        }
         path = self.styles_dir / f"{sid}.json"
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         self.reload()
@@ -345,6 +248,7 @@ class CastBoard:
             del self.overrides[key]
             self.save_overrides()
             return True
+        # username-only match
         dropped = False
         for k in list(self.overrides):
             if k.endswith(":" + username.lower()) and (not platform or k.startswith(platform + ":")):
@@ -376,84 +280,7 @@ class CastBoard:
         if bucket:
             self.tags[bucket].add(key)
 
-    def _job_person(self, assigned: list[dict], match: str) -> Optional[dict]:
-        needle = (match or "").lower()
-        for row in assigned:
-            if (row.get("job") or "").lower() == needle:
-                return row
-        return None
-
-    def _build_cards(
-        self,
-        style: dict,
-        assigned: list[dict],
-        starring: list[dict],
-        by_platform: dict,
-        title: str,
-    ) -> list[dict]:
-        studio = str(style.get("studio") or "Fridge Pictures")
-        hold = float(style.get("card_hold_sec") or 2.8)
-        plats = [p for p in ("twitch", "kick", "youtube") if by_platform.get(p)]
-        labels = {"twitch": "Twitch", "kick": "Kick", "youtube": "YouTube"}
-        names = [labels[p] for p in plats]
-        if not names:
-            assoc = ""
-        elif len(names) == 1:
-            assoc = "In association with " + names[0]
-        elif len(names) == 2:
-            assoc = "In association with " + names[0] + " and " + names[1]
-        else:
-            assoc = "In association with " + ", ".join(names[:-1]) + " and " + names[-1]
-        opening = style.get("opening") or DEFAULT_MOVIE["opening"]
-        cards: list[dict] = []
-        for spec in opening:
-            if not isinstance(spec, dict):
-                continue
-            kind = str(spec.get("type") or "").lower()
-            if kind == "mpaa":
-                line = str(style.get("mpaa") or spec.get("line") or "")
-                if line:
-                    cards.append({"type": "mpaa", "kicker": "", "line": line, "hold_sec": min(hold, 2.2)})
-            elif kind == "studio":
-                cards.append({
-                    "type": "studio",
-                    "kicker": "",
-                    "line": f"A {studio} Production",
-                    "hold_sec": hold,
-                })
-            elif kind == "title":
-                cards.append({
-                    "type": "title",
-                    "kicker": "",
-                    "line": title or "Thanks for watching",
-                    "hold_sec": hold + 0.4,
-                })
-            elif kind == "association":
-                if style.get("in_association", True) and assoc:
-                    cards.append({"type": "association", "kicker": "", "line": assoc, "hold_sec": hold})
-                loc = str(style.get("location") or "")
-                if loc:
-                    cards.append({"type": "location", "kicker": "", "line": loc, "hold_sec": hold * 0.85})
-            elif kind == "job":
-                person = self._job_person(assigned, str(spec.get("match") or ""))
-                if person:
-                    cards.append({
-                        "type": "credit",
-                        "kicker": str(spec.get("label") or person.get("job") or ""),
-                        "line": person.get("display_name") or person.get("username"),
-                        "hold_sec": hold,
-                    })
-            elif kind == "starring" and starring:
-                lead = starring[0]
-                cards.append({
-                    "type": "credit",
-                    "kicker": "Starring",
-                    "line": lead.get("display_name") or lead.get("username"),
-                    "hold_sec": hold + 0.2,
-                })
-        return cards
-
-    def decorate(self, snapshot: dict, started_at: float, *, title: str = "") -> dict:
+    def decorate(self, snapshot: dict, started_at: float) -> dict:
         style = self.get_style()
         mode = style.get("style") or "names"
         chatters = list(snapshot.get("chatters") or [])
@@ -464,14 +291,14 @@ class CastBoard:
             snapshot["cast"] = None
             return snapshot
 
-        jobs: list[tuple[str, str, str]] = []
+        jobs: list[tuple[str, str, str]] = []  # dept_id, dept_title, job
         for d in style.get("departments") or []:
             did = str(d.get("id") or d.get("title") or "crew")
-            dtitle = str(d.get("title") or "Crew")
+            title = str(d.get("title") or "Crew")
             for job in d.get("jobs") or []:
                 job = clamp_job(job)
                 if job:
-                    jobs.append((did, dtitle, job))
+                    jobs.append((did, title, job))
 
         rng = random.Random(int(started_at) if started_at else 1)
         order = list(jobs)
@@ -510,12 +337,8 @@ class CastBoard:
 
         by_dept: dict[str, dict] = {}
         dept_order = []
-        thanks: list[dict] = []
         for row in assigned:
             did = row.get("department_id") or "crew"
-            if did == "pinned":
-                thanks.append(row)
-                continue
             if did not in by_dept:
                 by_dept[did] = {"id": did, "title": row.get("department") or "Crew", "rows": []}
                 dept_order.append(did)
@@ -524,8 +347,7 @@ class CastBoard:
         groups_out = []
         top_n = int(style.get("top_talkers") or 5)
         ranked = sorted(chatters, key=lambda c: int(c.get("messages") or 0), reverse=True)
-        top_list = ranked[: max(0, top_n)]
-        top_keys = {f"{c.get('platform')}:{c.get('username')}" for c in top_list}
+        top_keys = {f"{c.get('platform')}:{c.get('username')}" for c in ranked[: max(0, top_n)]}
 
         def in_source(src: str, c: dict) -> bool:
             key = f"{c.get('platform')}:{c.get('username')}"
@@ -541,24 +363,8 @@ class CastBoard:
                 return key in self.tags[src] or key.lower() in self.tags[src]
             return False
 
-        starring: list[dict] = []
-        billing = ["Starring", "with", "featuring"]
-        for i, c in enumerate(top_list):
-            item = dict(c)
-            if i == 0:
-                item["billing"] = "Starring"
-            elif i == len(top_list) - 1 and len(top_list) > 1:
-                item["billing"] = "and"
-            elif i < len(billing):
-                item["billing"] = billing[i]
-            else:
-                item["billing"] = ""
-            starring.append(item)
-
         for g in style.get("groups") or []:
             src = str(g.get("source") or "").lower()
-            if src == "top":
-                continue
             if src in ("raiders", "followers", "gifted") and not self.allow_alert_groups:
                 continue
             members = [c for c in chatters if in_source(src, c)]
@@ -570,33 +376,15 @@ class CastBoard:
                     "chatters": members,
                 })
 
-        by_plat = snapshot.get("by_platform") or {}
-        studio = str(style.get("studio") or "Fridge Pictures")
-        year = str(datetime.now().year)
-        legal = [_fill(line, studio, year) for line in (style.get("legal") or DEFAULT_MOVIE["legal"])]
-        stinger = dict(style.get("stinger") or DEFAULT_MOVIE["stinger"])
-        cards = self._build_cards(style, assigned, starring, by_plat, title)
-
         snapshot["cast"] = {
             "departments": [by_dept[k] for k in dept_order],
             "groups": groups_out,
-            "starring": starring,
-            "thanks": thanks,
             "overflow": {
                 "title": style.get("overflow") or "Additional Voices",
                 "chatters": overflow,
             },
-            "cards": cards,
-            "legal": [ln for ln in legal if ln],
-            "stinger": stinger if stinger.get("enabled", True) else None,
-            "studio": studio,
-            "end_hold_sec": float(style.get("end_hold_sec") or 4),
-            "look": {
-                "letterbox": bool(style.get("letterbox", True)),
-                "grain": bool(style.get("grain", True)),
-                "vignette": bool(style.get("vignette", True)),
-            },
         }
+        # also stamp job onto chatters for the name list / admin
         job_map = {f"{r.get('platform')}:{r.get('username')}": r.get("job") for r in assigned}
         for c in snapshot["chatters"]:
             c["job"] = job_map.get(f"{c.get('platform')}:{c.get('username')}")

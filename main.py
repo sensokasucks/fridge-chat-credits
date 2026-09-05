@@ -63,22 +63,15 @@ class ChatCredits:
         self.state.root = ROOT
         self.state.bus = self.bus
         self.cast = CastBoard(ROOT, allow_alert_groups=False)
-        self.cast.set_style((config.get("credits") or {}).get("style_id") or "movie")
+        self.cast.set_style((config.get("credits") or {}).get("style_id") or "names")
         self.state.cast = self.cast
         load_theme(self.state)
-        if os.environ.get("CREDITS_DEMO") == "1":
-            self.cast.set_style("movie")
-            self.state.theme["style_id"] = "movie"
-            self.state.theme["style"] = "movie"
-            self.state.theme["letterbox"] = True
-            self.state.theme["grain"] = True
-            self.state.theme["vignette"] = True
-            self.state.theme["duration_sec"] = 55
-            self.state.theme["mode"] = "loop"
-            if (self.state.theme.get("background") or "transparent") == "transparent":
-                self.state.theme["background"] = "#000"
         self.state.theme["style_id"] = self.cast.style_id
         self.state.theme["style"] = self.cast.get_style().get("style") or "names"
+        if os.environ.get("CREDITS_DEMO") == "1":
+            # Preview pane is not a transparent compositor — use a solid stage.
+            if (self.state.theme.get("background") or "transparent") == "transparent":
+                self.state.theme["background"] = "#000"
         self.state.play["mode"] = self.state.theme.get("mode") or "loop"
         self.state.apply_config = self.apply_runtime_config
         self.adapters: dict = {}
@@ -168,64 +161,56 @@ class ChatCredits:
     async def _seed_demo(self) -> None:
         """Preview-only names so the roll has something to crawl."""
         samples = [
-            (Platform.TWITCH, "AriaVox", True, True, 12),
-            (Platform.TWITCH, "pixelranch", False, True, 9),
-            (Platform.KICK, "NeonHarbor", False, True, 7),
-            (Platform.KICK, "mod_maple", True, True, 5),
-            (Platform.YOUTUBE, "Lo-Fi Lynx", False, False, 4),
-            (Platform.TWITCH, "copperkettle", False, True, 3),
-            (Platform.KICK, "questinggnat", False, False, 2),
-            (Platform.YOUTUBE, "StudioMoth", False, True, 2),
-            (Platform.TWITCH, "emberwalk", False, False, 1),
-            (Platform.KICK, "saltandbit", False, False, 1),
-            (Platform.TWITCH, "nightorchard", False, True, 1),
-            (Platform.YOUTUBE, "viscounttea", False, False, 1),
-            (Platform.KICK, "bramblecast", False, False, 1),
-            (Platform.TWITCH, "softcheckpoint", False, False, 1),
-            (Platform.MANUAL, "the_crew", False, False, 1),
-            (Platform.TWITCH, "riverglass", False, False, 1),
-            (Platform.KICK, "hexlane", False, False, 1),
-            (Platform.YOUTUBE, "paperlantern", False, False, 1),
-            (Platform.TWITCH, "duskparcel", False, False, 1),
-            (Platform.KICK, "wildstatic", False, False, 1),
-            (Platform.TWITCH, "lowpolyfarm", False, False, 1),
-            (Platform.KICK, "coastalping", False, False, 1),
-            (Platform.YOUTUBE, "amberthread", False, False, 1),
-            (Platform.TWITCH, "silentcart", False, False, 1),
-            (Platform.KICK, "fogandfiber", False, False, 1),
-            (Platform.TWITCH, "rookandrelay", False, False, 1),
-            (Platform.YOUTUBE, "tinwhistle", False, False, 1),
-            (Platform.KICK, "copperline", False, False, 1),
-            (Platform.TWITCH, "moonwell", False, False, 1),
-            (Platform.KICK, "atlascrumb", False, False, 1),
-            (Platform.YOUTUBE, "firstlight", False, False, 1),
-            (Platform.TWITCH, "peatandpine", False, False, 1),
-            (Platform.KICK, "silverlatch", False, False, 1),
-            (Platform.TWITCH, "harborfinch", False, False, 1),
-            (Platform.YOUTUBE, "quiltedbyte", False, False, 1),
-            (Platform.KICK, "northkiln", False, False, 1),
+            (Platform.TWITCH, "AriaVox", True),
+            (Platform.TWITCH, "pixelranch", False),
+            (Platform.KICK, "NeonHarbor", False),
+            (Platform.KICK, "mod_maple", True),
+            (Platform.YOUTUBE, "Lo-Fi Lynx", False),
+            (Platform.TWITCH, "copperkettle", False),
+            (Platform.KICK, "questinggnat", False),
+            (Platform.YOUTUBE, "StudioMoth", False),
+            (Platform.TWITCH, "emberwalk", False),
+            (Platform.KICK, "saltandbit", False),
+            (Platform.TWITCH, "nightorchard", False),
+            (Platform.YOUTUBE, "viscounttea", False),
+            (Platform.KICK, "bramblecast", False),
+            (Platform.TWITCH, "softcheckpoint", False),
+            (Platform.MANUAL, "the_crew", False),
+            (Platform.TWITCH, "riverglass", False),
+            (Platform.KICK, "hexlane", False),
+            (Platform.YOUTUBE, "paperlantern", False),
+            (Platform.TWITCH, "duskparcel", False),
+            (Platform.KICK, "wildstatic", False),
+            (Platform.TWITCH, "lowpolyfarm", False),
+            (Platform.KICK, "coastalping", False),
+            (Platform.YOUTUBE, "amberthread", False),
+            (Platform.TWITCH, "silentcart", False),
+            (Platform.KICK, "fogandfiber", False),
+            (Platform.TWITCH, "rookandrelay", False),
+            (Platform.YOUTUBE, "tinwhistle", False),
+            (Platform.KICK, "copperline", False),
+            (Platform.TWITCH, "moonwell", False),
+            (Platform.KICK, "atlascrumb", False),
+            (Platform.YOUTUBE, "firstlight", False),
+            (Platform.TWITCH, "peatandpine", False),
+            (Platform.KICK, "silverlatch", False),
+            (Platform.TWITCH, "harborfinch", False),
+            (Platform.YOUTUBE, "quiltedbyte", False),
+            (Platform.KICK, "northkiln", False),
         ]
-        for plat, name, is_mod, is_sub, n in samples:
+        for plat, name, is_mod in samples:
             name = name.strip()
-            user = ChatUser(
+            await self.bus.publish_chat(ChatEvent(
                 platform=plat,
-                id=name,
-                username=name,
-                display_name=name,
-                is_mod=is_mod,
-                is_subscriber=is_sub,
-            )
-            for i in range(n):
-                await self.bus.publish_chat(ChatEvent(
+                user=ChatUser(
                     platform=plat,
-                    user=user,
-                    message="(demo)",
-                ))
-        try:
-            self.cast.pin("twitch", "ariavox", "Director", set_by="demo")
-            self.cast.pin("kick", "mod_maple", "Showrunner", set_by="demo")
-        except Exception:
-            pass
+                    id=name,
+                    username=name,
+                    display_name=name,
+                    is_mod=is_mod,
+                ),
+                message="(demo)",
+            ))
         log.info("Seeded %s demo chatters for preview", len(samples))
 
     async def _persist_loop(self, every: float) -> None:

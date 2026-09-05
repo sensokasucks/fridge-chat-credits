@@ -34,7 +34,7 @@
       border-radius: 10px;
       overflow: hidden;
       background: #000;
-      height: min(42vh, 380px);
+      height: min(48vh, 440px);
       position: relative;
     }
     .preview-wrap iframe {
@@ -109,15 +109,9 @@
       gap: 16px;
     }
     .cfg .card h2 { margin-bottom: 8px; }
-    .dept { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; }
-    .dept-head { display: flex; gap: 8px; align-items: center; }
-    .dept-head input { flex: 1; }
-    textarea.block {
-      width: 100%; background: #26221c; color: var(--ink); border: 1px solid var(--line);
-      border-radius: 6px; padding: 8px; font: inherit; resize: vertical;
-    }
-    #movie-editor { margin-top: 8px; }
+    .cfg-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 16px 0; }
   </style>
+  <link rel="stylesheet" href="/overlay/credits-editor.css" />
 </head>
 <body>
   <header>
@@ -127,7 +121,7 @@
     </p>
   </header>
   <div class="preview-wrap">
-    <div class="preview-cap">Live overlay — crawl starts from the bottom</div>
+    <div class="preview-cap">Live overlay — same Webpage source as OBS / XSplit</div>
     <iframe id="preview" title="Credits roll preview" src="/overlay/credits.html"></iframe>
   </div>
   <main>
@@ -142,11 +136,11 @@
       <div class="row">
         <button id="btn-loop">Loop</button>
         <button id="btn-once">Play once</button>
-        <button id="btn-clear">Play once, then empty</button>
         <button id="btn-hold">Hold still</button>
       </div>
       <div class="row">
         <button id="btn-pause">Pause / play</button>
+        <button id="btn-restart">Restart roll</button>
         <button class="danger" id="btn-reset">Reset session</button>
       </div>
       <p class="meta" style="margin-top:12px">
@@ -158,60 +152,7 @@
 
     <section class="card">
       <h2>Look</h2>
-      <label>Title</label>
-      <input type="text" id="title" />
-      <label>Subtitle</label>
-      <input type="text" id="subtitle" />
-      <label>Footer</label>
-      <input type="text" id="footer" />
-      <div class="grid2">
-        <div>
-          <label>Columns</label>
-          <select id="columns">
-            <option>1</option><option>2</option><option>3</option>
-          </select>
-        </div>
-        <div>
-          <label>Sort</label>
-          <select id="sort">
-            <option value="first_seen">First seen</option>
-            <option value="name">Name</option>
-            <option value="messages">Most messages</option>
-            <option value="last_seen">Last seen</option>
-          </select>
-        </div>
-        <div>
-          <label>Speed (px/s)</label>
-          <input type="number" id="speed_px_per_sec" min="10" max="200" />
-        </div>
-        <div>
-          <label>Target time (sec, 0 = use speed)</label>
-          <input type="number" id="duration_sec" min="0" max="600" />
-        </div>
-        <div>
-          <label>Name size</label>
-          <input type="number" id="name_size_px" min="12" max="48" />
-        </div>
-        <div>
-          <label>Title color</label>
-          <input type="text" id="title_color" />
-        </div>
-        <div>
-          <label>Name color</label>
-          <input type="text" id="name_color" />
-        </div>
-      </div>
-      <label><input type="checkbox" id="group_by_platform" /> Group by platform</label>
-      <label><input type="checkbox" id="show_platform" /> Platform dots</label>
-      <label><input type="checkbox" id="show_message_count" /> Show message counts</label>
-      <label><input type="checkbox" id="highlight_mods" /> Highlight mods</label>
-      <label><input type="checkbox" id="letterbox" /> Letterbox</label>
-      <label><input type="checkbox" id="grain" /> Film grain</label>
-      <label><input type="checkbox" id="vignette" /> Vignette</label>
-      <label><input type="checkbox" id="clear_when_done" /> Leave the screen empty when the roll finishes</label>
-      <div class="row" style="margin-top:12px">
-        <button class="primary" id="btn-save">Save look</button>
-      </div>
+      <div id="credits-editor"></div>
       <label>Test name</label>
       <div class="row">
         <input type="text" id="seed-name" placeholder="username" style="flex:1" />
@@ -227,83 +168,9 @@
       <h2>Movie style</h2>
       <label>Style file</label>
       <select id="cast-style"></select>
-      <p class="meta">Pick Names for a plain list, or Studio for the full roll. Job titles max 50 characters.</p>
+      <p class="meta">Copy <code>config/cast/movie.json</code> to add your own style. Jobs max 50 characters.</p>
       <div class="row" style="margin-top:8px">
         <button class="primary" id="btn-cast-style">Use this style</button>
-      </div>
-      <div id="movie-editor">
-        <label>Studio</label>
-        <input type="text" id="mv-studio" maxlength="80" placeholder="Fridge Pictures" />
-        <label>MPAA line</label>
-        <input type="text" id="mv-mpaa" maxlength="80" />
-        <label>Location line</label>
-        <input type="text" id="mv-location" maxlength="120" />
-        <label>Overflow heading</label>
-        <input type="text" id="mv-overflow" maxlength="80" />
-        <div class="grid2">
-          <div>
-            <label>Starring count</label>
-            <input type="number" id="mv-top" min="0" max="30" />
-          </div>
-          <div>
-            <label>Card hold (sec)</label>
-            <input type="number" id="mv-card-hold" min="0.5" max="12" step="0.1" />
-          </div>
-          <div>
-            <label>End hold (sec)</label>
-            <input type="number" id="mv-end-hold" min="0" max="20" step="0.1" />
-          </div>
-          <div>
-            <label>Stinger hold (sec)</label>
-            <input type="number" id="mv-stinger-hold" min="0.5" max="12" step="0.1" />
-          </div>
-        </div>
-        <label><input type="checkbox" id="mv-assoc" /> “In association with” card</label>
-        <p class="meta" style="margin-top:10px">Opening cards</p>
-        <label><input type="checkbox" id="mv-open-mpaa" /> MPAA bumper</label>
-        <label><input type="checkbox" id="mv-open-studio" /> Studio production</label>
-        <label><input type="checkbox" id="mv-open-title" /> Title</label>
-        <label><input type="checkbox" id="mv-open-assoc" /> Association / location</label>
-        <label><input type="checkbox" id="mv-open-dir" /> Directed by (pinned job)</label>
-        <div class="grid2">
-          <div>
-            <label>Job match</label>
-            <input type="text" id="mv-dir-match" maxlength="50" />
-          </div>
-          <div>
-            <label>Card label</label>
-            <input type="text" id="mv-dir-label" maxlength="50" />
-          </div>
-        </div>
-        <label><input type="checkbox" id="mv-open-write" /> Written by (pinned job)</label>
-        <div class="grid2">
-          <div>
-            <label>Job match</label>
-            <input type="text" id="mv-write-match" maxlength="50" />
-          </div>
-          <div>
-            <label>Card label</label>
-            <input type="text" id="mv-write-label" maxlength="50" />
-          </div>
-        </div>
-        <label><input type="checkbox" id="mv-open-star" /> Starring card</label>
-        <label>Legal (one line each, {year} {studio} ok)</label>
-        <textarea class="block" id="mv-legal" rows="5"></textarea>
-        <p class="meta" style="margin-top:10px">Stinger</p>
-        <label><input type="checkbox" id="mv-stinger-on" /> Show stinger</label>
-        <label>Kicker</label>
-        <input type="text" id="mv-stinger-kicker" maxlength="80" />
-        <label>Line</label>
-        <input type="text" id="mv-stinger-line" maxlength="80" />
-        <p class="meta" style="margin-top:10px">Departments (jobs, one per line)</p>
-        <div id="mv-depts"></div>
-        <button type="button" id="mv-add-dept">Add department</button>
-        <p class="meta" style="margin-top:10px">Name groups</p>
-        <div id="mv-groups"></div>
-        <div class="row" style="margin-top:10px">
-          <button class="primary" id="btn-movie-save">Save movie style</button>
-        </div>
-        <span class="meta" id="mv-save-status"></span>
       </div>
       <label>Pin a name (stays across streams)</label>
       <div class="row">
@@ -392,41 +259,25 @@
     </div>
   </section>
 
+  <script src="/overlay/credits-editor.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    const THEME_FIELDS = [
-      "title","subtitle","footer","columns","sort","speed_px_per_sec","duration_sec",
-      "name_size_px","title_color","name_color"
-    ];
-    const CHECKS = ["group_by_platform","show_platform","show_message_count","highlight_mods","letterbox","grain","vignette","clear_when_done"];
     let theme = {};
     let play = {};
     let lastConfig = {};
+    const lookEditor = CreditsEditor.mount({
+      el: $("credits-editor"),
+      themeUrl: "/api/theme",
+      playUrl: "/api/play",
+    });
 
     function fillTheme(t) {
-      theme = t;
-      for (const k of THEME_FIELDS) {
-        if ($(k) && t[k] != null) $(k).value = t[k];
-      }
-      for (const k of CHECKS) {
-        if ($(k)) $(k).checked = !!t[k];
-      }
+      theme = t || {};
+      if (lookEditor) lookEditor.fill(theme);
     }
 
     function collectTheme() {
-      const body = {};
-      for (const k of THEME_FIELDS) {
-        const el = $(k);
-        if (!el) continue;
-        let v = el.value;
-        if (["columns","speed_px_per_sec","duration_sec","name_size_px"].includes(k)) v = Number(v);
-        body[k] = v;
-      }
-      for (const k of CHECKS) {
-        const el = $(k);
-        if (el) body[k] = el.checked;
-      }
-      return body;
+      return lookEditor ? lookEditor.collect() : {};
     }
 
     function renderRoster(r) {
@@ -454,7 +305,7 @@
       return r.json();
     }
 
-    $("btn-save").onclick = async () => {
+    $("btn-save") && ($("btn-save").onclick = async () => {
       const body = collectTheme();
       body.persist = true;
       const r = await fetch("/api/theme", {
@@ -463,14 +314,14 @@
         body: JSON.stringify(body),
       });
       fillTheme(await r.json());
-    };
+    });
     $("btn-roll").onclick = () => post("/api/play", { playing: true, mode: "loop", freeze: true, restart: true });
     $("btn-live").onclick = () => post("/api/play", { freeze: false, playing: true });
     $("btn-loop").onclick = () => post("/api/play", { mode: "loop", playing: true, restart: true });
     $("btn-once").onclick = () => post("/api/play", { mode: "once", playing: true, freeze: true, restart: true });
-    $("btn-clear").onclick = () => post("/api/play", { mode: "clear", playing: true, freeze: true, restart: true });
     $("btn-hold").onclick = () => post("/api/play", { mode: "hold", playing: true });
     $("btn-pause").onclick = () => post("/api/play", { playing: play.playing === false });
+    $("btn-restart").onclick = () => post("/api/play", { playing: true, restart: true });
     $("btn-reset").onclick = async () => {
       if (confirm("Clear every unique chatter for this session?")) {
         await post("/api/session/reset", {});
@@ -490,168 +341,9 @@
       ).join("") || `<div class="meta">No pinned names</div>`;
     }
 
-    const GROUP_DEFS = [
-      { id: "mods", source: "mods", title: "Moderation Unit" },
-      { id: "subs", source: "subs", title: "Season Regulars" },
-      { id: "top", source: "top", title: "Starring" },
-    ];
-    const GROUP_DEFS_CORE = [
-      { id: "raiders", source: "raiders", title: "The Raiding Party" },
-      { id: "followers", source: "followers", title: "New in Town" },
-      { id: "gifted", source: "gifted", title: "Gifted Subs" },
-    ];
-    let allowAlertGroups = false;
-    let currentStyle = {};
-
-    function groupCatalog() {
-      return allowAlertGroups ? GROUP_DEFS.concat(GROUP_DEFS_CORE) : GROUP_DEFS;
-    }
-
-    function renderDepts(depts) {
-      const wrap = $("mv-depts");
-      if (!wrap) return;
-      wrap.innerHTML = "";
-      (depts && depts.length ? depts : [{ title: "", jobs: [] }]).forEach((d) => {
-        wrap.appendChild(deptEl(d));
-      });
-    }
-
-    function deptEl(d) {
-      d = d || {};
-      const box = document.createElement("div");
-      box.className = "dept";
-      box.innerHTML = `<div class="dept-head">
-        <input type="text" class="dept-title" maxlength="50" placeholder="Department title" />
-        <button type="button" class="dept-del">Remove</button>
-      </div>
-      <label>Jobs (one per line)</label>
-      <textarea class="block dept-jobs" rows="4"></textarea>`;
-      box.querySelector(".dept-title").value = d.title || "";
-      box.querySelector(".dept-jobs").value = (d.jobs || []).join("\n");
-      box.querySelector(".dept-del").onclick = () => box.remove();
-      return box;
-    }
-
-    function renderGroups(groups) {
-      const wrap = $("mv-groups");
-      if (!wrap) return;
-      const have = {};
-      (groups || []).forEach((g) => { have[g.source] = g; });
-      wrap.innerHTML = groupCatalog().map((def) => {
-        const g = have[def.source];
-        const on = !!g;
-        const title = (g && g.title) || def.title;
-        return `<label><input type="checkbox" class="grp-on" data-source="${esc(def.source)}" data-id="${esc(def.id)}" ${on ? "checked" : ""} />
-          <input type="text" class="grp-title" data-source="${esc(def.source)}" maxlength="50" value="${esc(title)}" /></label>`;
-      }).join("");
-    }
-
-    function openingHas(opening, type, match) {
-      return (opening || []).some((s) => s.type === type && (!match || (s.match || "") === match));
-    }
-
-    function openingJob(opening, fallbackMatch) {
-      const hit = (opening || []).find((s) => s.type === "job" && (s.match || "").toLowerCase() === fallbackMatch.toLowerCase())
-        || (opening || []).find((s) => s.type === "job" && !(s.match || "").toLowerCase().includes("show") && fallbackMatch === "Director")
-        || (opening || []).find((s) => s.type === "job");
-      return hit || {};
-    }
-
-    function fillMovieStyle(style) {
-      currentStyle = style || {};
-      const movie = (currentStyle.style || currentStyle.id) === "movie";
-      if ($("movie-editor")) $("movie-editor").style.display = movie || ($("cast-style") && $("cast-style").value === "movie") ? "" : "none";
-      if (!movie && ($("cast-style") && $("cast-style").value !== "movie")) return;
-      $("mv-studio").value = currentStyle.studio || "Fridge Pictures";
-      $("mv-mpaa").value = currentStyle.mpaa || "";
-      $("mv-location").value = currentStyle.location || "";
-      $("mv-overflow").value = currentStyle.overflow || "Additional Voices";
-      $("mv-top").value = currentStyle.top_talkers ?? 5;
-      $("mv-card-hold").value = currentStyle.card_hold_sec ?? 2.8;
-      $("mv-end-hold").value = currentStyle.end_hold_sec ?? 4;
-      $("mv-assoc").checked = currentStyle.in_association !== false;
-      const opening = currentStyle.opening || [];
-      $("mv-open-mpaa").checked = openingHas(opening, "mpaa") || !opening.length;
-      $("mv-open-studio").checked = openingHas(opening, "studio") || !opening.length;
-      $("mv-open-title").checked = openingHas(opening, "title") || !opening.length;
-      $("mv-open-assoc").checked = openingHas(opening, "association") || !opening.length;
-      $("mv-open-star").checked = openingHas(opening, "starring") || !opening.length;
-      const jobs = opening.filter((s) => s.type === "job");
-      const dir = jobs[0] || { match: "Director", label: "Directed by" };
-      const wr = jobs[1] || { match: "Showrunner", label: "Written by" };
-      $("mv-open-dir").checked = !!jobs[0] || !opening.length;
-      $("mv-open-write").checked = !!jobs[1] || !opening.length;
-      $("mv-dir-match").value = dir.match || "Director";
-      $("mv-dir-label").value = dir.label || "Directed by";
-      $("mv-write-match").value = wr.match || "Showrunner";
-      $("mv-write-label").value = wr.label || "Written by";
-      $("mv-legal").value = (currentStyle.legal || []).join("\n");
-      const st = currentStyle.stinger || {};
-      $("mv-stinger-on").checked = st.enabled !== false;
-      $("mv-stinger-kicker").value = st.kicker || "And also…";
-      $("mv-stinger-line").value = st.line || "the lurkers";
-      $("mv-stinger-hold").value = st.hold_sec ?? 4;
-      renderDepts(currentStyle.departments);
-      renderGroups(currentStyle.groups);
-    }
-
-    function collectMovieStyle() {
-      const opening = [];
-      if ($("mv-open-mpaa").checked) opening.push({ type: "mpaa" });
-      if ($("mv-open-studio").checked) opening.push({ type: "studio" });
-      if ($("mv-open-title").checked) opening.push({ type: "title" });
-      if ($("mv-open-assoc").checked) opening.push({ type: "association" });
-      if ($("mv-open-dir").checked) opening.push({ type: "job", match: $("mv-dir-match").value, label: $("mv-dir-label").value });
-      if ($("mv-open-write").checked) opening.push({ type: "job", match: $("mv-write-match").value, label: $("mv-write-label").value });
-      if ($("mv-open-star").checked) opening.push({ type: "starring" });
-      const departments = [...document.querySelectorAll("#mv-depts .dept")].map((box) => ({
-        id: (box.querySelector(".dept-title").value || "crew").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        title: box.querySelector(".dept-title").value,
-        jobs: lines(box.querySelector(".dept-jobs").value),
-      })).filter((d) => d.title || d.jobs.length);
-      const groups = [];
-      document.querySelectorAll("#mv-groups .grp-on").forEach((cb) => {
-        if (!cb.checked) return;
-        const src = cb.getAttribute("data-source");
-        const titleEl = document.querySelector(`#mv-groups .grp-title[data-source="${src}"]`);
-        groups.push({
-          id: cb.getAttribute("data-id") || src,
-          source: src,
-          title: (titleEl && titleEl.value) || src,
-        });
-      });
-      return {
-        id: ($("cast-style") && $("cast-style").value === "names") ? "movie" : ($("cast-style").value || "movie"),
-        label: "Movie",
-        style: "movie",
-        studio: $("mv-studio").value,
-        mpaa: $("mv-mpaa").value,
-        location: $("mv-location").value,
-        overflow: $("mv-overflow").value,
-        top_talkers: Number($("mv-top").value) || 5,
-        card_hold_sec: Number($("mv-card-hold").value) || 2.8,
-        end_hold_sec: Number($("mv-end-hold").value) || 4,
-        in_association: $("mv-assoc").checked,
-        letterbox: $("letterbox") ? $("letterbox").checked : true,
-        grain: $("grain") ? $("grain").checked : true,
-        vignette: $("vignette") ? $("vignette").checked : true,
-        legal: lines($("mv-legal").value),
-        opening,
-        stinger: {
-          enabled: $("mv-stinger-on").checked,
-          kicker: $("mv-stinger-kicker").value,
-          line: $("mv-stinger-line").value,
-          hold_sec: Number($("mv-stinger-hold").value) || 4,
-        },
-        departments,
-        groups,
-      };
-    }
-
     async function loadCast() {
       try {
         const data = await fetch("/api/cast").then((x) => x.json());
-        allowAlertGroups = !!data.allow_alert_groups;
         const sel = $("cast-style");
         if (sel) {
           sel.innerHTML = (data.styles || []).map((s) =>
@@ -659,7 +351,6 @@
           ).join("");
         }
         fillPins(data.overrides || []);
-        fillMovieStyle(data.style || {});
       } catch (e) { /* ignore */ }
     }
     if ($("btn-cast-style")) {
@@ -669,33 +360,6 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ style_id: $("cast-style").value }),
         });
-        loadCast();
-      };
-    }
-    if ($("cast-style")) {
-      $("cast-style").onchange = () => {
-        $("movie-editor").style.display = $("cast-style").value === "names" ? "none" : "";
-      };
-    }
-    if ($("mv-add-dept")) {
-      $("mv-add-dept").onclick = () => $("mv-depts").appendChild(deptEl({ title: "", jobs: [] }));
-    }
-    if ($("btn-movie-save")) {
-      $("btn-movie-save").onclick = async () => {
-        const status = $("mv-save-status");
-        try {
-          const res = await fetch("/api/cast/file", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(collectMovieStyle()),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "save failed");
-          status.textContent = "Saved";
-          loadCast();
-        } catch (e) {
-          status.textContent = String(e.message || e);
-        }
       };
     }
     if ($("btn-pin")) {

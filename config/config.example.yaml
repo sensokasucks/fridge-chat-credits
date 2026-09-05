@@ -58,17 +58,15 @@ credits:
   sort: "first_seen"                 # first_seen | last_seen | name | messages
   columns: 2
   speed_px_per_sec: 42
-  duration_sec: 0                    # 0 = use speed; else crawl lasts this many seconds
-  letterbox: true
-  grain: true
-  vignette: true
+  motion: "crawl"                    # crawl | crawl-down | starwars | cards | fade | slides | ticker | typewriter | matrix
+  name_enter: "none"                 # none | rise | fade | blur
+  page_hold_sec: 4.2
+  typewriter_unit: "line"            # line | card | page
   gap_after_loop_sec: 2.5
-  mode: "loop"                       # loop | once | hold | clear
-  clear_when_done: false             # Play once then blank the overlay
+  mode: "loop"                       # loop | once | hold
   show_platform: true
   show_message_count: false
   highlight_mods: true
-  style_id: "movie"                  # movie (Studio) | names
   font_family: '"Palatino Linotype", Palatino, "Times New Roman", Georgia, serif'
   title_size_px: 54
   name_size_px: 22

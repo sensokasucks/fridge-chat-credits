@@ -97,11 +97,7 @@ def roster_payload(state: AppState) -> dict:
             style = state.cast.get_style()
             snap["style"] = style.get("style") or "names"
             snap["style_id"] = state.cast.style_id
-            snap = state.cast.decorate(
-                snap,
-                state.roster.started_at,
-                title=(state.theme or {}).get("title") or "",
-            )
+            snap = state.cast.decorate(snap, state.roster.started_at)
     return snap
 
 
@@ -209,6 +205,14 @@ def create_app(state: AppState) -> FastAPI:
     async def put_theme(body: dict[str, Any]):
         persist = bool(body.pop("persist", True))
         body.pop("persist", None)
+        motion = body.get("motion")
+        if motion:
+            body["motion"] = str(motion).lower().strip()
+        if "style_id" in body and state.cast:
+            sid = state.cast.set_style(str(body.get("style_id") or "names"))
+            state.theme["style_id"] = sid
+            state.theme["style"] = state.cast.get_style().get("style") or "names"
+            body.pop("style_id", None)
         state.theme.update(body)
         if persist:
             save_theme(state)
@@ -225,7 +229,7 @@ def create_app(state: AppState) -> FastAPI:
     async def set_play(body: dict[str, Any]):
         if "playing" in body:
             state.play["playing"] = bool(body["playing"])
-        if "mode" in body and body["mode"] in ("loop", "once", "hold", "clear"):
+        if "mode" in body and body["mode"] in ("loop", "once", "hold"):
             state.play["mode"] = body["mode"]
             state.theme["mode"] = body["mode"]
         if "freeze" in body:
@@ -280,7 +284,6 @@ def create_app(state: AppState) -> FastAPI:
             "style": board.get_style(),
             "overrides": list(board.overrides.values()),
             "job_max": 50,
-            "allow_alert_groups": bool(board.allow_alert_groups),
         }
 
     @app.put("/api/cast/style")
@@ -306,8 +309,6 @@ def create_app(state: AppState) -> FastAPI:
             saved = board.save_style(body)
         except ValueError as e:
             return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
-        snap = roster_payload(state)
-        await manager.broadcast({"type": "roster", "data": snap})
         return {"ok": True, "style": saved, "styles": board.list_styles()}
 
     @app.post("/api/cast/pin")

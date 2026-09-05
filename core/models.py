@@ -15,14 +15,6 @@ class Platform(str, Enum):
     MANUAL = "manual"
 
 
-def strip_handle(value: str) -> str:
-    """YouTube (and others) prefix handles with @ — credits should not."""
-    text = str(value or "").strip()
-    while text.startswith("@"):
-        text = text[1:].strip()
-    return text
-
-
 @dataclass
 class ChatUser:
     platform: Platform
@@ -36,10 +28,9 @@ class ChatUser:
     color: Optional[str] = None
 
     def __post_init__(self):
-        self.username = strip_handle(self.username).lower()
-        self.display_name = strip_handle(self.display_name or self.username)
         if not self.display_name:
             self.display_name = self.username
+        self.username = (self.username or "").lower().strip()
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -89,8 +80,8 @@ class Chatter:
     def from_dict(cls, data: dict[str, Any]) -> "Chatter":
         return cls(
             platform=str(data.get("platform") or ""),
-            username=strip_handle(data.get("username") or "").lower(),
-            display_name=strip_handle(data.get("display_name") or data.get("username") or ""),
+            username=str(data.get("username") or ""),
+            display_name=str(data.get("display_name") or data.get("username") or ""),
             first_seen=float(data.get("first_seen") or 0),
             last_seen=float(data.get("last_seen") or 0),
             messages=int(data.get("messages") or 1),

@@ -6,9 +6,7 @@ It listens to the platforms you enable, keeps **one unique row per chatter per p
 
 Nothing here talks to Minecraft, Factorio, or Stream Core unless you opt in. The process is one Python asyncio loop + a tiny JSON session file.
 
-**Repo:** [github.com/sensokasucks/fridge-chat-credits](https://github.com/sensokasucks/fridge-chat-credits)
-
-**Non-tech install (Windows):** follow **[INSTALL.md](INSTALL.md)** — install Python once (pip is included; you never run pip yourself), then double-click **install.bat**. You do **not** need Stream Core.
+**Non-tech install (Windows):** follow **[INSTALL.md](INSTALL.md)** — install Python once (pip is included; you never run pip yourself), then double-click **INSTALL Chat Credits.bat**. You do **not** need Stream Core.
 
 ```
 Twitch IRC ─┐
@@ -31,16 +29,19 @@ Typical idle cost is a few tens of MB of RAM for the Python process.
 ## Quick start (Windows)
 
 1. Install [Python 3.10+](https://www.python.org/downloads/) and tick **Add python.exe to PATH**.
-2. Double-click **`install.bat`** (once).
-3. Double-click **`start.bat`** whenever you stream.
+2. From the workshop folder, double-click **`INSTALL Chat Credits.bat`** (once).
+3. Double-click **`START Chat Credits.bat`** whenever you stream.
 4. Open [http://127.0.0.1:3854/](http://127.0.0.1:3854/) — enable Twitch / Kick, Save config, restart once.
 5. Webpage source: `http://127.0.0.1:3854/overlay/credits.html` (transparent).
 
 Full click-by-click: **[INSTALL.md](INSTALL.md)**.
 
+Inside this folder you can also use `install.bat` / `start.bat`.
+
 ### Manual / macOS / Linux
 
 ```bash
+cd fridge-chat-credits
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -63,35 +64,15 @@ If you already run Stream Core, you can skip this standalone app and use **Admin
 
 Use a **transparent** Webpage source, full canvas or a centered column.
 
-## Studio roll (default)
-
-New installs use the **Studio** style (`config/cast/movie.json`). Sequence:
-
-1. Hold cards — MPAA bumper, “A {studio} Production”, title, in association with live platforms, Directed by / Written by (from pins), Starring
-2. Crawl — rest of starring, crew jobs, mods / subs, additional voices, special thanks
-3. Legal block + end hold
-4. Stinger (e.g. “And also… the lurkers”)
-
-Edit all of that from the control desk **Movie style** panel — studio name, cards, jobs, legal, stinger, departments, groups. No JSON file required. **Save movie style** writes `config/cast/movie.json`.
-
-Other look controls on the same page:
-
-| Control | What it does |
-|---------|----------------|
-| Target time (sec) | Finish the crawl in N seconds (0 = use speed) |
-| Letterbox / grain / vignette | Film frame |
-| Pin a name | Same job every stream (Director / Showrunner become opening cards) |
-| Style file | `Studio` (movie) or `Names` (plain grid) |
-
-YouTube `@handles` are stripped so names match the rest of the roll.
-
-Standalone does **not** include raid / follow / gifted-sub blocks or `!credit` chat commands — those stay Stream Core only.
-
 The overlay crawls with a pixel `requestAnimationFrame` loop (not CSS
-`@keyframes`). Speed is `credits.speed_px_per_sec` in real pixels, unless `duration_sec` is set.
+`@keyframes`). Speed is `credits.speed_px_per_sec` in real pixels.
 
-**Roll credits** freezes the unique list and restarts from the opening cards.
-New chatters in live mode are appended without jumping the roll back to
+The control desk **Look** editor is tabbed (Motion / Titles / Type / Color / Layout / List)
+with presets including Star Wars, End card, Typewriter, and Matrix. Details:
+[overlay/CREDITS.md](overlay/CREDITS.md).
+
+**Roll credits** freezes the unique list and restarts the crawl from below the
+frame. New chatters in live mode are appended without jumping the roll back to
 the top.
 
 ## Config (`config/config.yaml`)
@@ -163,10 +144,7 @@ Useful keys:
 | `group_by_platform` | Split Twitch / Kick / YouTube blocks |
 | `sort` | `first_seen` · `name` · `messages` · `last_seen` |
 | `columns` | 1–3 |
-| `speed_px_per_sec` | Crawl speed (ignored if `duration_sec` > 0) |
-| `duration_sec` | Target length of the crawl in seconds (`0` = use speed) |
-| `style_id` | `movie` (Studio) or `names` |
-| `letterbox` / `grain` / `vignette` | Film frame |
+| `speed_px_per_sec` | Crawl speed |
 | `mode` | `loop` · `once` · `hold` |
 | `show_platform` | Colored dots next to names |
 | `highlight_mods` | Gold names for mods / broadcaster |
@@ -183,9 +161,7 @@ Query-string overrides work on the overlay without touching config, e.g.
 - **Live list** — overlay grows as new unique people speak.
 - **Loop / Play once / Hold still** — playback mode.
 - **Reset session** — empty the unique list (also wipes `data/session.json`).
-- **Save look** — persist colors, type, speed, grouping, letterbox / grain.
-- **Movie style** — studio name, opening cards, jobs, legal, stinger, departments.
-- **Pin** — lock a person to a job across streams.
+- **Save look** — persist colors, type, speed, grouping.
 - **Add** — seed a test name so you can preview the roll offline.
 
 ## Adding another platform later
@@ -216,12 +192,10 @@ fridge-chat-credits/
 ├── INSTALL.md         # click-by-click for non-tech users
 ├── install.bat        # one-time Windows install
 ├── start.bat          # start while streaming
-├── config/
-│   ├── config.yaml          # created from config.example.yaml
-│   └── cast/movie.json      # Studio style (cards, jobs, legal)
-├── core/          models, bus, roster, config, cast
+├── config/config.yaml
+├── core/          models, bus, roster, config
 ├── adapters/      twitch, kick, youtube, stream_core
 ├── api/server.py
-├── overlay/       credits.html + control.html
-└── data/          session.json, theme.json, cast_overrides.json (runtime)
+├── overlay/       credits.html + credits.js + control desk + look editor
+└── data/          session.json + theme.json (created at runtime)
 ```
