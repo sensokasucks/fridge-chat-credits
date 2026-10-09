@@ -62,7 +62,7 @@ class ChatCredits:
         self.state.roster = self.roster
         self.state.root = ROOT
         self.state.bus = self.bus
-        self.cast = CastBoard(ROOT, allow_alert_groups=False)
+        self.cast = CastBoard(ROOT, allow_alert_groups=True)
         self.cast.set_style((config.get("credits") or {}).get("style_id") or "names")
         self.state.cast = self.cast
         load_theme(self.state)
@@ -157,6 +157,8 @@ class ChatCredits:
 
     async def _on_chat(self, event: ChatEvent) -> None:
         self.roster.ingest(event)
+        if getattr(event, "is_paid", False) or getattr(event.user, "is_paid", False):
+            self.cast.tag_alert("paid", event.platform.value, event.user.username)
 
     async def _seed_demo(self) -> None:
         """Preview-only names so the roll has something to crawl."""

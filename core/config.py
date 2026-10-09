@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from core.credits_theme import LOOK_DEFAULTS
+
 log = logging.getLogger("core.config")
 
 DEFAULT_IGNORE = [
@@ -60,48 +62,7 @@ DEFAULTS: dict[str, Any] = {
         }
     },
     "credits": {
-        "title": "Thanks for watching",
-        "subtitle": "",
-        "footer": "See you next stream",
-        "section_label": "Chatters",
-        "group_by_platform": False,
-        "sort": "first_seen",
-        "columns": 2,
-        "speed_px_per_sec": 42,
-        "gap_after_loop_sec": 2.5,
-        "mode": "loop",
-        "show_platform": True,
-        "show_message_count": False,
-        "highlight_mods": True,
-        "font_family": '"Palatino Linotype", Palatino, "Times New Roman", Georgia, serif',
-        "title_size_px": 54,
-        "name_size_px": 22,
-        "title_color": "#f3e2b0",
-        "name_color": "#f4f0e6",
-        "muted_color": "#9a8f78",
-        "mod_color": "#e8c36a",
-        "background": "transparent",
-        "text_shadow": "0 2px 8px rgba(0,0,0,0.85)",
-        "letter_spacing_em": 0.04,
-        "column_gap_px": 48,
-        "row_gap_px": 10,
-        "max_width_px": 920,
-        "custom_font_url": "",
-        "style_id": "names",
-        "motion": "crawl",
-        "name_enter": "none",
-        "sw_tilt_deg": 32,
-        "sw_perspective_px": 320,
-        "page_hold_sec": 4.2,
-        "page_fade_sec": 0.65,
-        "typewriter_cps": 32,
-        "typewriter_unit": "line",
-        "matrix_density": 1,
-        "highlight_vips": True,
-        "letterbox": False,
-        "grain": False,
-        "vignette": False,
-        "duration_sec": 0,
+        **LOOK_DEFAULTS,
     },
 }
 

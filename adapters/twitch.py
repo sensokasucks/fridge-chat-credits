@@ -132,6 +132,7 @@ class TwitchAdapter(BaseAdapter):
             is_mod=tags.get("mod") == "1" or "moderator" in badge_names or "broadcaster" in badge_names,
             is_vip="vip" in badge_names,
             is_subscriber=tags.get("subscriber") == "1" or "subscriber" in badge_names,
+            is_paid=bool(tags.get("bits")),
             badges=badge_names,
             color=tags.get("color") or None,
         )
@@ -140,4 +141,5 @@ class TwitchAdapter(BaseAdapter):
             user=user,
             message=msg,
             message_id=tags.get("id"),
+            is_paid=bool(tags.get("bits")),
         ))

@@ -1,43 +1,61 @@
 # Credits overlay
 
-Webpage source for **Fridge Chat Credits** (`/overlay/credits.html`).
-Stream Core Admin → Credits uses the same overlay files if you run Core instead.
+Webpage source: `/overlay/credits.html`  
+Style editor: **Admin → Credits** (Stream Core) or the Chat Credits control desk.
 
-The overlay crawls with `requestAnimationFrame` (not CSS keyframes) so OBS / XSplit CEF keeps moving.
+The overlay crawls with a pixel `requestAnimationFrame` loop (not CSS `@keyframes`) so it moves in XSplit / OBS CEF. Look is live-editable; **Save look** writes it to disk.
 
-## Look editor
+## Style editor
 
-Control desk (standalone) and Admin → Credits (Core) share a tabbed editor:
+Tabs:
 
-| Tab | What it edits |
+| Tab | What it covers |
 |-----|----------------|
-| **Motion** | Presets, motion type, speed, Star Wars tilt, typewriter, Matrix density |
-| **Titles** | Title, subtitle, footer, section heading |
-| **Type** | Font, sizes, tracking |
-| **Color** | Title / name / muted / mod colors, background |
-| **Layout** | Columns, width, letterbox / grain / vignette |
-| **List** | Sort, grouping, platform dots, mod / VIP highlight |
+| **Motion** | How the roll plays, easing, intros, loop transitions |
+| **Copy** | Title, subtitle, footer, section label |
+| **Type** | Font preset / custom Google Font, sizes, weight, letter-spacing |
+| **Color** | Title / names / muted / mods / VIPs, glow, shadow, backdrop |
+| **Layout** | Columns, alignment, job-row style, divider, max width, **cast format** |
+| **List** | Sort, platform grouping, dots, counts, mod / VIP highlight |
 
-Live preview applies immediately. **Save look** writes `data/theme.json` (standalone) or Core config. **Restart roll** clears leftover motion and starts again from the top.
+Presets along the top (Classic, Star Wars, Gold titles, Neon night, Teletype, End card, Name tape, Minimal) stamp a bundle of those keys. Tweak after.
 
-Presets always set `name_enter: none` except Classic/Gold/Neon crawls that opt into rise/blur.
+Edits **preview live** on the overlay. Save look persists them (`config.yaml` in Core, `data/theme.json` in Chat Credits).
+
+Cast format (Names / Movie / Studio Lot) is on the Layout tab. Job pins stay in the Movie / Pins card.
 
 ## Motions
 
-| Id | What you see |
-|----|----------------|
-| `crawl` | Names rise from the bottom (classic roll) |
-| `crawl-down` | Names fall from the top |
-| `starwars` | Yellow crawl on a 3D floor. Loops *before* the vanishing point so it never smears |
-| `cards` | One department / page of names at a time (end card). Names are paginated to fit |
-| `fade` | Same pages, cross-fade |
-| `slides` | Same pages, slide sideways |
+| Id | Behaviour |
+|----|-----------|
+| `crawl` | Classic titles rolling up |
+| `crawl-down` | Same, downward |
+| `starwars` | Perspective tilt + crawl |
+| `cards` | One block at a time, scale in |
+| `fade` | One block at a time, crossfade |
+| `slides` | One block at a time, slide |
 | `ticker` | Horizontal name tape |
-| `typewriter` | Characters appear with a caret. Unit: line, card, or page |
-| `matrix` | Green rain + names decoding in the center |
+| `typewriter` | Names appear in order |
 
-Opening movie cards + stinger still play on crawl / crawl-down / Star Wars when the movie style file defines them.
+Page motions (`cards` / `fade` / `slides` / `typewriter`) use `page_duration_sec` and `page_transition_ms`. Crawl motions use `speed_px_per_sec` or `duration_sec` (0 = use px/s).
 
-## Restart / motion switch
+## Useful keys
 
-Changing motion type or pressing **Restart roll** hard-resets: animation frame, timers, Matrix canvas, inline transforms, parked reel, page layer. That is what stops a black screen after a glitchy switch.
+Same keys the editor writes. Overlay query-string overrides still work, e.g.
+
+`/overlay/credits.html?motion=starwars&title=THE%20CREW`
+
+| Key | Meaning |
+|-----|---------|
+| `motion` | See table above |
+| `easing` | `linear` · `ease-in` · `ease-out` · `ease-in-out` · `smooth` |
+| `title_intro` | `none` · `fade` · `scale` · `wipe` · `letters` |
+| `name_enter` | `none` · `fade` · `rise` · `slide` · `blur` (as names enter the frame) |
+| `loop_transition` | `cut` · `fade` · `wipe` |
+| `mask_fade_px` | Soft edge fade. `0` = hard crop |
+| `vignette` | Inset shadow |
+| `glow` / `glow_color` / `glow_px` | Title + name bloom |
+| `job_layout` | `dots` · `stacked` · `inline` |
+| `custom_font_url` | Stylesheet URL (Google Fonts). Needs network in OBS/XSplit |
+
+Transparent Webpage source is still the default (`background: transparent`). Turn on **Opaque backdrop** in Color only for a preview card.

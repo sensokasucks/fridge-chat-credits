@@ -78,6 +78,35 @@ DEFAULT_MOVIE: dict[str, Any] = {
 }
 
 
+def _person_key(c: dict) -> str:
+    return (c.get("display_name") or c.get("username") or "").strip().lower()
+
+
+def _unique_people(chatters: list[dict]) -> list[dict]:
+    """One row per on-screen name (merge Kick/Twitch/YouTube twins)."""
+    best: dict[str, dict] = {}
+    order: list[str] = []
+    for c in chatters:
+        key = _person_key(c)
+        if not key:
+            continue
+        if key not in best:
+            best[key] = dict(c)
+            order.append(key)
+            continue
+        cur = best[key]
+        cur["messages"] = int(cur.get("messages") or 0) + int(c.get("messages") or 0)
+        cur["is_mod"] = bool(cur.get("is_mod") or c.get("is_mod"))
+        cur["is_vip"] = bool(cur.get("is_vip") or c.get("is_vip"))
+        cur["is_subscriber"] = bool(cur.get("is_subscriber") or c.get("is_subscriber"))
+        cur["is_paid"] = bool(cur.get("is_paid") or c.get("is_paid"))
+        if (c.get("last_seen") or 0) > (cur.get("last_seen") or 0):
+            cur["last_seen"] = c.get("last_seen")
+            if c.get("color"):
+                cur["color"] = c.get("color")
+    return [best[k] for k in order]
+
+
 def clamp_job(title: str) -> str:
     text = re.sub(r"\s+", " ", str(title or "")).strip()
     if len(text) > JOB_MAX:
@@ -118,6 +147,7 @@ class CastBoard:
             "raiders": set(),
             "followers": set(),
             "gifted": set(),
+            "donors": set(),
         }
         self.reload()
 
@@ -276,6 +306,10 @@ class CastBoard:
             "follow": "followers",
             "gift": "gifted",
             "subscribe": "gifted",
+            "paid": "donors",
+            "cheer": "donors",
+            "donation": "donors",
+            "superchat": "donors",
         }.get((kind or "").lower())
         if bucket:
             self.tags[bucket].add(key)
@@ -283,7 +317,7 @@ class CastBoard:
     def decorate(self, snapshot: dict, started_at: float) -> dict:
         style = self.get_style()
         mode = style.get("style") or "names"
-        chatters = list(snapshot.get("chatters") or [])
+        chatters = _unique_people(list(snapshot.get("chatters") or []))
         snapshot["style"] = mode
         snapshot["style_id"] = style.get("id") or self.style_id
         snapshot["overrides"] = list(self.overrides.values())
@@ -291,14 +325,15 @@ class CastBoard:
             snapshot["cast"] = None
             return snapshot
 
-        jobs: list[tuple[str, str, str]] = []  # dept_id, dept_title, job
+        jobs: list[tuple[str, str, str, str]] = []  # dept_id, title, job, pool
         for d in style.get("departments") or []:
             did = str(d.get("id") or d.get("title") or "crew")
             title = str(d.get("title") or "Crew")
+            pool = str(d.get("pool") or "any").lower()
             for job in d.get("jobs") or []:
                 job = clamp_job(job)
                 if job:
-                    jobs.append((did, title, job))
+                    jobs.append((did, title, job, pool))
 
         rng = random.Random(int(started_at) if started_at else 1)
         order = list(jobs)
@@ -315,25 +350,70 @@ class CastBoard:
             item["pinned"] = pinned
             return item
 
+        def matches_pool(c: dict, pool: str) -> bool:
+            pool = (pool or "any").lower()
+            if pool in ("", "any", "all"):
+                return True
+            key = f"{c.get('platform')}:{c.get('username')}".lower()
+            if pool in ("paid", "donor", "donors", "bits", "cheers", "superchat"):
+                return bool(c.get("is_paid")) or key in self.tags.get("donors", set())
+            if pool in ("subs", "sub", "subscriber", "subscribers"):
+                return bool(c.get("is_subscriber"))
+            if pool in ("mods", "mod", "moderator"):
+                return bool(c.get("is_mod"))
+            if pool in ("vips", "vip"):
+                return bool(c.get("is_vip"))
+            if pool in self.tags:
+                return key in {x.lower() for x in self.tags[pool]}
+            return False
+
+        shown: set[str] = set()
         for c in chatters:
+            pk = _person_key(c)
+            if not pk or pk in shown:
+                continue
             plat = str(c.get("platform") or "")
             user = str(c.get("username") or "")
             ov = self.find_override(plat, user)
             if ov and ov.get("job"):
                 assigned.append(row_for(c, clamp_job(ov["job"]), "pinned", "Special Thanks", True))
-                continue
-            picked = None
-            for item in order:
-                sig = item[0] + ":" + item[2]
-                if sig in used:
+                shown.add(pk)
+
+        # Restricted pools first (paid / mods / subs / …), then open jobs.
+        pool_pass = (
+            "paid", "donors", "mods", "subs", "gifted", "followers", "raiders", "vips", "any",
+        )
+        remaining = [c for c in chatters if _person_key(c) not in shown]
+        for want in pool_pass:
+            still = []
+            for c in remaining:
+                pk = _person_key(c)
+                if not pk or pk in shown:
                     continue
-                used.add(sig)
-                picked = item
-                break
-            if picked:
-                assigned.append(row_for(c, picked[2], picked[0], picked[1], False))
-            else:
-                overflow.append(dict(c))
+                picked = None
+                for item in order:
+                    did, title, job, pool = item
+                    sig = did + ":" + job
+                    if sig in used:
+                        continue
+                    if want == "any":
+                        if pool not in ("", "any", "all"):
+                            continue
+                    else:
+                        if pool != want and not (want == "paid" and pool in ("donors", "paid")):
+                            continue
+                        if not matches_pool(c, pool):
+                            continue
+                    used.add(sig)
+                    picked = item
+                    break
+                if picked:
+                    assigned.append(row_for(c, picked[2], picked[0], picked[1], False))
+                    shown.add(pk)
+                else:
+                    still.append(c)
+            remaining = still
+        overflow = [dict(c) for c in remaining]
 
         by_dept: dict[str, dict] = {}
         dept_order = []
@@ -355,6 +435,9 @@ class CastBoard:
                 return bool(c.get("is_mod"))
             if src == "subs":
                 return bool(c.get("is_subscriber"))
+            if src in ("paid", "donors"):
+                key_l = key.lower()
+                return bool(c.get("is_paid")) or key_l in self.tags.get("donors", set())
             if src == "vips":
                 return bool(c.get("is_vip"))
             if src == "top":
@@ -367,7 +450,13 @@ class CastBoard:
             src = str(g.get("source") or "").lower()
             if src in ("raiders", "followers", "gifted") and not self.allow_alert_groups:
                 continue
-            members = [c for c in chatters if in_source(src, c)]
+            members = []
+            for c in chatters:
+                pk = _person_key(c)
+                if pk in shown or not in_source(src, c):
+                    continue
+                members.append(c)
+                shown.add(pk)
             if members:
                 groups_out.append({
                     "id": g.get("id") or src,
@@ -376,6 +465,7 @@ class CastBoard:
                     "chatters": members,
                 })
 
+        overflow = [c for c in overflow if _person_key(c) not in shown]
         snapshot["cast"] = {
             "departments": [by_dept[k] for k in dept_order],
             "groups": groups_out,
