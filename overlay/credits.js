@@ -12,6 +12,9 @@
   const MATRIX_GLYPHS = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789";
 
   const qs = new URLSearchParams(location.search);
+  const API_THEME = ["/api/theme", "/api/credits/theme"];
+  const API_ROSTER = ["/api/roster", "/api/credits/roster"];
+  const API_PLAY = ["/api/play", "/api/credits/play"];
   let theme = {};
   let roster = { chatters: [], count: 0 };
   let play = { playing: true, mode: "loop", freeze: false, generation: 0 };
@@ -20,6 +23,7 @@
   let lastThemeKey = "";
   let lastMotion = "";
   let lastEnter = "";
+  let lastMotionFp = "";
 
   const engine = {
     raf: 0,
@@ -198,6 +202,7 @@
     engine.typeAcc = 0;
     lastMotion = "";
     lastEnter = "";
+    lastMotionFp = "";
   }
 
   function applyQuery(t) {
@@ -240,6 +245,7 @@
     r.setProperty("--sw-tilt", num(theme.sw_tilt_deg, 52) + "deg");
     r.setProperty("--sw-perspective", num(theme.sw_perspective_px, 420) + "px");
     r.setProperty("--page-fade", Math.max(120, num(theme.page_fade_sec, 0.65) * 1000) + "ms");
+    r.setProperty("--matrix", theme.title_color || "#00ff41");
     const bg = theme.background || "transparent";
     document.body.style.background = bg;
     document.body.classList.toggle("solid", bg !== "transparent" && bg !== "");
@@ -369,7 +375,20 @@
       t.highlight_vips, t.name_size_px, t.title_size_px, t.font_family, t.style_id, t.style,
       t.letterbox, t.grain, t.vignette, t.duration_sec, t.clear_when_done,
       t.motion, t.name_enter, t.typewriter_unit, t.typewriter_cps, t.page_hold_sec,
-      t.sw_tilt_deg, t.sw_perspective_px, t.max_width_px, t.column_gap_px, t.row_gap_px,
+      t.matrix_density, t.sw_tilt_deg, t.sw_perspective_px, t.max_width_px,
+      t.column_gap_px, t.row_gap_px,
+    ].join("~");
+  }
+
+  function motionFingerprint(t) {
+    t = t || theme;
+    return [
+      String(t.motion || "crawl").toLowerCase(),
+      String(t.typewriter_unit || "line"),
+      String(t.typewriter_cps || ""),
+      String(t.matrix_density || ""),
+      String(t.page_hold_sec || ""),
+      String(t.name_enter || "none"),
     ].join("~");
   }
 
@@ -1128,6 +1147,10 @@
     const h = canvas.clientHeight || window.innerHeight;
     canvas.width = w;
     canvas.height = h;
+    if (m.ctx) {
+      m.ctx.fillStyle = "#000000";
+      m.ctx.fillRect(0, 0, w, h);
+    }
     const density = Math.max(0.4, Math.min(2.2, num(theme.matrix_density, 1)));
     m.font = Math.max(12, Math.round(14 * density));
     const colCount = Math.max(12, Math.floor(w / m.font));
@@ -1160,15 +1183,18 @@
     const ctx = m.ctx;
     const w = m.canvas.width;
     const h = m.canvas.height;
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillStyle = "rgba(0,0,0,0.32)";
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#00ff41";
-    ctx.font = m.font + "px monospace";
+    ctx.font = m.font + "px \"Share Tech Mono\", monospace";
     for (let i = 0; i < m.drops.length; i++) {
       const ch = MATRIX_GLYPHS.charAt(Math.floor(Math.random() * MATRIX_GLYPHS.length));
-      ctx.fillText(ch, i * m.font, m.drops[i] * m.font);
-      if (m.drops[i] * m.font > h && Math.random() > 0.975) m.drops[i] = 0;
-      m.drops[i] += 0.85;
+      const y = m.drops[i] * m.font;
+      ctx.fillStyle = "#a8ffb8";
+      ctx.fillText(ch, i * m.font, y);
+      ctx.fillStyle = theme.title_color || "#00ff41";
+      ctx.fillText(ch, i * m.font, y - m.font);
+      if (y > h && Math.random() > 0.975) m.drops[i] = 0;
+      m.drops[i] += 0.95;
     }
     const sec = m.sections[m.section];
     const hold = pageHoldMs();
@@ -1243,8 +1269,10 @@
     if (CRAWL_MOTIONS[motion] && enter !== "none") {
       document.body.classList.add("enter-" + enter);
     }
+    lastMotionFp = motionFingerprint(theme);
     const mode = play.mode || theme.mode || "loop";
-    if (play.playing === false || mode === "hold") {
+    const paused = play.playing === false || mode === "hold";
+    if (paused && CRAWL_MOTIONS[motion]) {
       renderReel();
       parkReel(false);
       later(function () {
@@ -1263,18 +1291,31 @@
       }, 16);
     } else if (motion === "typewriter") {
       startTypewriter(performance.now());
-      startRaf();
+      if (paused) {
+        const page = $("pages").querySelectorAll(".page")[engine.pageIndex];
+        (page ? collectTwLines(page) : []).forEach(function (el) {
+          el.textContent = el.getAttribute("data-text") || "";
+        });
+        engine.typeState = "hold";
+        engine.typeHoldUntil = Number.POSITIVE_INFINITY;
+      } else {
+        startRaf();
+      }
     } else if (PAGE_MOTIONS[motion]) {
       mountPages(false);
       engine.phase = "pages";
       engine.endUntil = 0;
-      startRaf();
+      if (!paused) startRaf();
     } else if (motion === "ticker") {
       startTicker();
-      startRaf();
+      if (!paused) startRaf();
     } else if (motion === "matrix") {
       startMatrix();
-      startRaf();
+      if (paused) {
+        tickMatrix(performance.now());
+      } else {
+        startRaf();
+      }
     }
     engine.started = true;
   }
@@ -1283,7 +1324,9 @@
     opts = opts || {};
     const motion = motionId();
     const gen = Number(play.generation || 0);
-    const motionChanged = motion !== lastMotion && lastMotion !== "";
+    const fp = motionFingerprint(theme);
+    const motionChanged = (motion !== lastMotion && lastMotion !== "") ||
+      (fp !== lastMotionFp && lastMotionFp !== "");
     const genChanged = gen !== engine.generation && engine.generation !== -1;
     const reset = !!(opts.reset) || motionChanged || genChanged || !engine.started;
     if (reset) {
@@ -1324,16 +1367,26 @@
     rebuildTimer = setTimeout(function () { paint(opts || {}); }, 40);
   }
 
+  async function fetchFirst(paths) {
+    for (let i = 0; i < paths.length; i++) {
+      try {
+        const r = await fetch(paths[i], { cache: "no-store" });
+        if (r.ok) return await r.json();
+      } catch (e) { /* try next mount path (standalone vs Stream Core) */ }
+    }
+    return null;
+  }
+
   async function boot() {
     try {
       const pack = await Promise.all([
-        fetch("/api/credits/theme").then(function (x) { return x.json(); }),
-        fetch("/api/credits/roster").then(function (x) { return x.json(); }),
-        fetch("/api/credits/play").then(function (x) { return x.json(); }),
+        fetchFirst(API_THEME),
+        fetchFirst(API_ROSTER),
+        fetchFirst(API_PLAY),
       ]);
-      applyTheme(pack[0]);
-      roster = pack[1];
-      play = pack[2];
+      applyTheme(pack[0] || {});
+      if (pack[1]) roster = pack[1];
+      if (pack[2]) play = pack[2];
     } catch (e) {
       applyTheme({});
     }
@@ -1349,8 +1402,9 @@
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       const kind = msg.type || "";
       if (kind === "theme" || kind === "credits_theme") {
+        const prev = motionFingerprint(theme);
         applyTheme(msg.data);
-        schedulePaint();
+        schedulePaint({ reset: prev !== motionFingerprint(theme) });
       }
       if (kind === "roster" || kind === "credits_roster") {
         roster = msg.data;

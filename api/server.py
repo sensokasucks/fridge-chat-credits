@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from core.models import ChatEvent, ChatUser, Platform
 from core.config import DEFAULTS, save_config as write_yaml_config
+from core.credits_theme import LOOK_DEFAULTS
 
 log = logging.getLogger("api.server")
 
@@ -68,7 +69,8 @@ def _theme_path(state: AppState) -> Path:
 
 
 def load_theme(state: AppState) -> dict:
-    theme = dict(state.config.get("credits") or {})
+    theme = dict(LOOK_DEFAULTS)
+    theme.update(state.config.get("credits") or {})
     path = _theme_path(state)
     if path.exists():
         try:
@@ -205,14 +207,10 @@ def create_app(state: AppState) -> FastAPI:
     async def put_theme(body: dict[str, Any]):
         persist = bool(body.pop("persist", True))
         body.pop("persist", None)
-        motion = body.get("motion")
-        if motion:
-            body["motion"] = str(motion).lower().strip()
         if "style_id" in body and state.cast:
             sid = state.cast.set_style(str(body.get("style_id") or "names"))
-            state.theme["style_id"] = sid
-            state.theme["style"] = state.cast.get_style().get("style") or "names"
-            body.pop("style_id", None)
+            body["style_id"] = sid
+            body["style"] = state.cast.get_style().get("style") or "names"
         state.theme.update(body)
         if persist:
             save_theme(state)

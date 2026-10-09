@@ -24,6 +24,7 @@ class ChatUser:
     is_mod: bool = False
     is_vip: bool = False
     is_subscriber: bool = False
+    is_paid: bool = False
     badges: list[str] = field(default_factory=list)
     color: Optional[str] = None
 
@@ -45,6 +46,7 @@ class ChatEvent:
     message: str
     timestamp: float = field(default_factory=time.time)
     message_id: Optional[str] = None
+    is_paid: bool = False
     raw: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -68,6 +70,7 @@ class Chatter:
     is_mod: bool = False
     is_vip: bool = False
     is_subscriber: bool = False
+    is_paid: bool = False
 
     @property
     def key(self) -> str:
@@ -89,4 +92,5 @@ class Chatter:
             is_mod=bool(data.get("is_mod")),
             is_vip=bool(data.get("is_vip")),
             is_subscriber=bool(data.get("is_subscriber")),
+            is_paid=bool(data.get("is_paid")),
         )

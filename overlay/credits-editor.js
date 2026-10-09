@@ -3,15 +3,15 @@
   "use strict";
 
   const MOTIONS = [
-    { id: "crawl", label: "Crawl up" },
-    { id: "crawl-down", label: "Crawl down" },
-    { id: "starwars", label: "Star Wars" },
-    { id: "cards", label: "End cards" },
-    { id: "fade", label: "Fade pages" },
-    { id: "slides", label: "Slide pages" },
-    { id: "ticker", label: "Name tape" },
-    { id: "typewriter", label: "Typewriter" },
-    { id: "matrix", label: "Matrix" },
+    { id: "crawl", label: "Crawl up", blurb: "Classic rolling titles", icon: "crawl-up" },
+    { id: "crawl-down", label: "Crawl down", blurb: "Start at the top", icon: "crawl-down" },
+    { id: "starwars", label: "Star Wars", blurb: "Perspective crawl", icon: "sw" },
+    { id: "cards", label: "Cards", blurb: "One block at a time", icon: "cards" },
+    { id: "fade", label: "Fade pages", blurb: "Crossfade sections", icon: "fade" },
+    { id: "slides", label: "Slides", blurb: "Side-step each block", icon: "slides" },
+    { id: "ticker", label: "Ticker", blurb: "Horizontal name tape", icon: "ticker" },
+    { id: "typewriter", label: "Typewriter", blurb: "Types each character", icon: "type" },
+    { id: "matrix", label: "Matrix", blurb: "Rain + name decode", icon: "matrix" },
   ];
 
   const PRESETS = [
@@ -72,7 +72,7 @@
     },
     {
       id: "gold",
-      label: "Gold",
+      label: "Gold titles",
       theme: {
         motion: "crawl",
         name_enter: "rise",
@@ -94,7 +94,7 @@
     },
     {
       id: "neon",
-      label: "Neon",
+      label: "Neon night",
       theme: {
         motion: "crawl",
         name_enter: "blur",
@@ -305,21 +305,37 @@
     }).join("");
   }
 
+  function motionCards() {
+    return MOTIONS.map(function (m) {
+      return (
+        '<button type="button" class="crd-ed-motion" data-motion="' + m.id + '">' +
+          '<span class="crd-ed-motion-ico" data-ico="' + m.icon + '" aria-hidden="true"></span>' +
+          '<span class="crd-ed-motion-copy">' +
+            '<strong>' + m.label + "</strong>" +
+            '<em>' + m.blurb + "</em>" +
+          "</span>" +
+        "</button>"
+      );
+    }).join("");
+  }
+
   function template(core) {
     return [
       '<div class="crd-ed">',
+      '  <p class="hint crd-ed-lead">Pick a preset to jump, then refine. Motion changes restart the roll.</p>',
       '  <div class="crd-ed-presets" data-role="presets"></div>',
       '  <div class="crd-ed-tabs">',
       '    <button type="button" class="crd-ed-tab on" data-pane="motion">Motion</button>',
-      '    <button type="button" class="crd-ed-tab" data-pane="titles">Titles</button>',
+      '    <button type="button" class="crd-ed-tab" data-pane="titles">Copy</button>',
       '    <button type="button" class="crd-ed-tab" data-pane="type">Type</button>',
       '    <button type="button" class="crd-ed-tab" data-pane="color">Color</button>',
       '    <button type="button" class="crd-ed-tab" data-pane="layout">Layout</button>',
       '    <button type="button" class="crd-ed-tab" data-pane="list">List</button>',
       "  </div>",
       '  <div class="crd-ed-pane on" data-pane="motion">',
-      '    <label>Motion type <select data-k="motion">' + motionOptions() + "</select></label>",
-      '    <p class="hint">Star Wars recedes on a 3D floor and loops before the vanishing point. End cards paginate names so nobody is left off-screen. Typewriter types line by line (or card / page). Matrix rains glyphs while names decode.</p>',
+      '    <select class="crd-ed-motion-select" data-k="motion" aria-label="Motion type">' + motionOptions() + "</select>",
+      '    <div class="crd-ed-motions" data-role="motions">' + motionCards() + "</div>",
+      '    <p class="hint">Typewriter types character by character. Matrix rains glyphs while names decode. Both need Loop / Play — Hold still only shows a frozen first frame.</p>',
       '    <div class="row2">',
       '      <label>Speed (px/s) <input data-k="speed_px_per_sec" type="number" min="8" max="240" /></label>',
       '      <label>Target time (sec) <input data-k="duration_sec" type="number" min="0" max="600" /></label>',
@@ -479,6 +495,7 @@
       if (field("show_platform") && theme.show_platform == null) field("show_platform").checked = true;
       if (field("highlight_mods") && theme.highlight_mods == null) field("highlight_mods").checked = true;
       markPreset();
+      markMotion();
     }
 
     function collect() {
@@ -497,9 +514,27 @@
     }
 
     function markPreset() {
-      const motion = (theme.motion || field("motion") && field("motion").value || "crawl");
+      const motion = (theme.motion || (field("motion") && field("motion").value) || "crawl");
+      const aliases = {
+        typewriter: "teletype",
+        matrix: "matrix",
+        starwars: "starwars",
+        ticker: "nametape",
+        cards: "endcard",
+        fade: "minimal",
+        crawl: "classic",
+        "crawl-down": "classic",
+      };
+      const inferred = aliases[motion] || motion;
       presetWrap.querySelectorAll(".crd-ed-chip").forEach(function (b) {
-        b.classList.toggle("on", b.dataset.preset === activePreset || (!activePreset && b.dataset.preset === motion));
+        b.classList.toggle("on", b.dataset.preset === activePreset || (!activePreset && b.dataset.preset === inferred));
+      });
+    }
+
+    function markMotion() {
+      const motion = (theme.motion || (field("motion") && field("motion").value) || "crawl");
+      ed.querySelectorAll(".crd-ed-motion").forEach(function (b) {
+        b.classList.toggle("on", b.getAttribute("data-motion") === motion);
       });
     }
 
@@ -532,7 +567,12 @@
       el.addEventListener("change", function () {
         activePreset = "";
         markPreset();
+        markMotion();
         live();
+        const k = el.getAttribute("data-k");
+        if (k === "motion" || k === "typewriter_unit" || k === "typewriter_cps" || k === "matrix_density") {
+          restartPlay();
+        }
       });
       el.addEventListener("input", function () {
         if (el.type === "checkbox" || el.tagName === "SELECT") return;
@@ -541,14 +581,41 @@
       });
     });
 
+    function restartPlay() {
+      if (!opts.playUrl) return Promise.resolve();
+      return fetch(withAuth(opts.playUrl), {
+        method: "POST",
+        headers: headers(),
+        credentials: "same-origin",
+        body: JSON.stringify({ playing: true, restart: true }),
+      }).catch(function () { return null; });
+    }
+
+    ed.querySelectorAll(".crd-ed-motion").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const motion = btn.getAttribute("data-motion");
+        const sel = field("motion");
+        if (sel) sel.value = motion;
+        activePreset = motion === "typewriter" ? "teletype" : (motion === "matrix" ? "matrix" : "");
+        theme = Object.assign({}, theme, { motion: motion });
+        markPreset();
+        markMotion();
+        live();
+        restartPlay();
+        status.textContent = btn.querySelector("strong") ? btn.querySelector("strong").textContent : motion;
+      });
+    });
+
     function applyPreset(p) {
       activePreset = p.id;
       const body = Object.assign({}, collect(), p.theme, { name_enter: p.theme.name_enter || "none" });
       fill(body);
       markPreset();
+      markMotion();
       put(body, true).then(function (t) {
         fill(t);
         status.textContent = p.label + " saved";
+        return restartPlay();
       }).catch(function (e) {
         status.textContent = String(e.message || e);
       });

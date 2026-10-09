@@ -48,15 +48,13 @@ If it says Python is not recognized, run the Python installer again and tick **A
 1. Open [https://github.com/sensokasucks/fridge-chat-credits](https://github.com/sensokasucks/fridge-chat-credits)
 2. Click the green **Code** button → **Download ZIP**
 3. Unzip it somewhere easy, for example `C:\ChatCredits`
-4. Open that unzipped folder. You should see `INSTALL.md`, `install.bat`, and `start.bat`.
-
-If you already have the **Fridge Workshop** monorepo (`flavr-leftovers`), Chat Credits lives in the `fridge-chat-credits` folder there — skip to Step 3 and use **INSTALL Chat Credits.bat** from the workshop root, or `install.bat` inside this folder.
+4. Open that unzipped folder. You should see `main.py`, `install.bat` and `start.bat` inside it.
 
 ---
 
 ## Step 3 — One-time install (this is the pip part — you never type pip)
 
-1. Open the **Chat Credits** folder (the one with `install.bat`).
+1. Open the Chat Credits folder.
 2. Double-click **`install.bat`**
 3. A black window opens. Let it run. It will:
    - find Python
@@ -66,6 +64,7 @@ If you already have the **Fridge Workshop** monorepo (`flavr-leftovers`), Chat C
 4. When it says **Install finished**, press any key.
 
 If it says **Python was not found**, go back to Step 1 and tick **Add python.exe to PATH**.
+
 
 ---
 
@@ -133,7 +132,7 @@ Add a test name with **Add** if you want to preview before you go live.
 
 You already installed. Only do this:
 
-1. Double-click **`start.bat`**
+1. Double-click **start.bat**
 2. If you want a fresh name list, click **Reset session** on the control desk.
 
 ---

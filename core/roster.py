@@ -95,6 +95,7 @@ class Roster:
             existing.is_mod = existing.is_mod or user.is_mod
             existing.is_vip = existing.is_vip or user.is_vip
             existing.is_subscriber = existing.is_subscriber or user.is_subscriber
+            existing.is_paid = existing.is_paid or getattr(user, "is_paid", False) or bool(getattr(event, "is_paid", False))
             self._dirty = True
             return None
 
@@ -109,6 +110,7 @@ class Roster:
             is_mod=user.is_mod,
             is_vip=user.is_vip,
             is_subscriber=user.is_subscriber,
+            is_paid=bool(getattr(user, "is_paid", False) or getattr(event, "is_paid", False)),
         )
         self.chatters[key] = chatter
         self._dirty = True

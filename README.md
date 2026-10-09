@@ -6,8 +6,6 @@ It listens to the platforms you enable, keeps **one unique row per chatter per p
 
 Nothing here talks to Minecraft, Factorio, or Stream Core unless you opt in. The process is one Python asyncio loop + a tiny JSON session file.
 
-**Non-tech install (Windows):** follow **[INSTALL.md](INSTALL.md)** — install Python once (pip is included; you never run pip yourself), then double-click **INSTALL Chat Credits.bat**. You do **not** need Stream Core.
-
 ```
 Twitch IRC ─┐
 Kick Pusher─┤
@@ -28,24 +26,22 @@ Typical idle cost is a few tens of MB of RAM for the Python process.
 
 ## Quick start (Windows)
 
-1. Install [Python 3.10+](https://www.python.org/downloads/) and tick **Add python.exe to PATH**.
-2. From the workshop folder, double-click **`INSTALL Chat Credits.bat`** (once).
-3. Double-click **`START Chat Credits.bat`** whenever you stream.
-4. Open [http://127.0.0.1:3854/](http://127.0.0.1:3854/) — enable Twitch / Kick, Save config, restart once.
-5. Webpage source: `http://127.0.0.1:3854/overlay/credits.html` (transparent).
+From the **workshop root**:
 
-Full click-by-click: **[INSTALL.md](INSTALL.md)**.
+1. Double-click **`install.bat`** once.
+2. Edit `config/config.yaml` — enable Twitch / Kick / YouTube / ingest.
+3. Double-click **`start.bat`**.
 
-Inside this folder you can also use `install.bat` / `start.bat`.
-
-### Manual / macOS / Linux
+Inside this folder the same scripts are `install.bat` and `start.bat`.
 
 ```bash
 cd fridge-chat-credits
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
-# edit config/config.yaml — or use the control-desk Config section
+
+# edit config/config.yaml — enable twitch / kick / youtube / ingest
 python main.py
 ```
 
@@ -65,11 +61,10 @@ If you already run Stream Core, you can skip this standalone app and use **Admin
 Use a **transparent** Webpage source, full canvas or a centered column.
 
 The overlay crawls with a pixel `requestAnimationFrame` loop (not CSS
-`@keyframes`). Speed is `credits.speed_px_per_sec` in real pixels.
-
-The control desk **Look** editor is tabbed (Motion / Titles / Type / Color / Layout / List)
-with presets including Star Wars, End card, Typewriter, and Matrix. Details:
-[overlay/CREDITS.md](overlay/CREDITS.md).
+`@keyframes`). CEF in XSplit/OBS was dropping the CSS animation: an inline
+`animation: none` reset was overriding `animation-name`, and `translateY(100%)`
+is a percentage of the *reel*, not the viewport, so the roll never actually
+moved. Speed is `credits.speed_px_per_sec` in real pixels.
 
 **Roll credits** freezes the unique list and restarts the crawl from below the
 frame. New chatters in live mode are appended without jumping the roll back to
@@ -133,18 +128,21 @@ Identity is `(platform, username)`. The same person on Twitch and Kick appears t
 
 ### Credits look
 
-Everything under `credits:` is live-editable from the control desk (saved to `data/theme.json` so your YAML comments stay intact).
+Everything under `credits:` is live-editable from the control desk (saved to `data/theme.json` so your YAML comments stay intact). The desk now has a **tabbed style editor** (Motion / Copy / Type / Color / Layout / List) with presets and live preview.
+
+Full key list and motion ids: [overlay/CREDITS.md](overlay/CREDITS.md).
 
 Useful keys:
 
 | Key | Meaning |
 |-----|---------|
 | `title` / `subtitle` / `footer` | Header and closer lines |
+| `motion` | `crawl` · `crawl-down` · `starwars` · `cards` · `fade` · `slides` · `ticker` · `typewriter` |
 | `section_label` | Label above the mixed name grid |
 | `group_by_platform` | Split Twitch / Kick / YouTube blocks |
 | `sort` | `first_seen` · `name` · `messages` · `last_seen` |
-| `columns` | 1–3 |
-| `speed_px_per_sec` | Crawl speed |
+| `columns` | 1–4 |
+| `speed_px_per_sec` | Crawl / ticker speed |
 | `mode` | `loop` · `once` · `hold` |
 | `show_platform` | Colored dots next to names |
 | `highlight_mods` | Gold names for mods / broadcaster |
@@ -161,7 +159,7 @@ Query-string overrides work on the overlay without touching config, e.g.
 - **Live list** — overlay grows as new unique people speak.
 - **Loop / Play once / Hold still** — playback mode.
 - **Reset session** — empty the unique list (also wipes `data/session.json`).
-- **Save look** — persist colors, type, speed, grouping.
+- **Save look** — persist colors, type, motion, and layout from the style editor.
 - **Add** — seed a test name so you can preview the roll offline.
 
 ## Adding another platform later
@@ -189,13 +187,15 @@ Bound to `127.0.0.1` by default.
 fridge-chat-credits/
 ├── main.py
 ├── requirements.txt
-├── INSTALL.md         # click-by-click for non-tech users
-├── install.bat        # one-time Windows install
-├── start.bat          # start while streaming
+├── start.bat
 ├── config/config.yaml
 ├── core/          models, bus, roster, config
 ├── adapters/      twitch, kick, youtube, stream_core
 ├── api/server.py
-├── overlay/       credits.html + credits.js + control desk + look editor
+├── overlay/       credits.html + control.html
 └── data/          session.json + theme.json (created at runtime)
 ```
+
+## Where this came from
+
+This repo is the home of standalone Chat Credits again (2026-10-09). Until then the maintained copy lived in [flavr-leftovers](https://github.com/sensokasucks/flavr-leftovers) as `fridge-chat-credits/`; this version brings that copy over. Stream Core has its own built-in credits, so you only need this app if you don't run Core.

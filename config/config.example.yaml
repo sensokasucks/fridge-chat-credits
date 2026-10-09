@@ -35,12 +35,15 @@ kick:
   # https://kick.com/api/v2/channels/YOUR_KICK_CHANNEL
   # chatroom_id: 12345678
 
-# Needs a YouTube Data API v3 key + the live VOD/video id
+# Default: innertube (no API key). Needs the live video id only.
+# Set mode: official + api_key to use Data API v3 instead.
 youtube:
   enabled: false
-  api_key: ""
-  video_id: ""
-  # live_chat_id: ""                 # optional override
+  mode: "innertube"                 # innertube | official | auto
+  video_id: ""                      # youtube.com/watch?v=THIS
+  api_key: ""                       # only for mode=official
+  # live_chat_id: ""                # official-mode override
+
 
 # Reuse Stream Core chat instead of opening a second Kick socket
 ingest:
@@ -58,12 +61,9 @@ credits:
   sort: "first_seen"                 # first_seen | last_seen | name | messages
   columns: 2
   speed_px_per_sec: 42
-  motion: "crawl"                    # crawl | crawl-down | starwars | cards | fade | slides | ticker | typewriter | matrix
-  name_enter: "none"                 # none | rise | fade | blur
-  page_hold_sec: 4.2
-  typewriter_unit: "line"            # line | card | page
   gap_after_loop_sec: 2.5
   mode: "loop"                       # loop | once | hold
+  motion: "crawl"                    # crawl | crawl-down | starwars | cards | fade | slides | ticker | typewriter
   show_platform: true
   show_message_count: false
   highlight_mods: true

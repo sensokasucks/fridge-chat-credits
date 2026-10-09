@@ -37,6 +37,7 @@ html, body {
 body.solid { background: #000; }
 body.motion-matrix { background: #000; }
 body.motion-starwars { background: #000; }
+body.motion-typewriter { background: #12100c; }
 
 #stage {
   position: relative;
@@ -449,6 +450,33 @@ body.motion-slides .page.leave {
 body.motion-cards .page,
 body.motion-typewriter .page {
   transform: none;
+}
+
+body.motion-typewriter #pages {
+  background:
+    linear-gradient(rgba(18, 16, 12, 0.08) 50%, transparent 50%),
+    #12100c;
+  background-size: 100% 4px, auto;
+}
+
+body.motion-typewriter .page {
+  align-items: flex-start;
+  text-align: left;
+  font-family: "Share Tech Mono", "Courier New", Courier, monospace;
+}
+
+body.motion-typewriter .title,
+body.motion-typewriter .section,
+body.motion-typewriter .name,
+body.motion-typewriter .job,
+body.motion-typewriter .who,
+body.motion-typewriter .footer {
+  font-family: inherit;
+  letter-spacing: 0.08em;
+}
+
+body.motion-typewriter .grid {
+  text-align: left;
 }
 
 .page .title { margin-bottom: 6px; }
