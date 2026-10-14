@@ -199,3 +199,11 @@ fridge-chat-credits/
 ## Where this came from
 
 This repo is the home of standalone Chat Credits again (2026-10-09). Until then the maintained copy lived in [flavr-leftovers](https://github.com/sensokasucks/flavr-leftovers) as `fridge-chat-credits/`; this version brings that copy over. Stream Core has its own built-in credits, so you only need this app if you don't run Core.
+
+## License
+
+Copyright (C) 2026 Sensoka (sensokasucks).
+
+This project is free software under the [GNU General Public License v3.0](LICENSE) (GPL-3.0). You can use it for free, including on monetized streams and other commercial use, change it, and share it. If you pass it on to anyone, changed or not, free or paid, you must give them the full source code under the same GPL-3.0 terms.
+
+Python packages installed from `requirements.txt` are not included in this repository and keep their own licenses.
