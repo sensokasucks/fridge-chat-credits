@@ -1,4 +1,10 @@
-"""Kick.com chat via the public Pusher socket. No viewer polling."""
+"""Kick.com chat via the public Pusher socket. No viewer polling.
+
+Start-up looks up the channel's numeric chatroom id from ``kick.channel_slug``
+(Kick's public channel API), unless ``kick.chatroom_id`` is set in config.yaml
+(use that when the lookup returns 403). Then it subscribes to that chatroom on
+Kick's Pusher WebSocket and emits a ChatEvent per chat message.
+"""
 
 from __future__ import annotations
 
@@ -16,11 +22,13 @@ from core.models import ChatEvent, ChatUser, Platform
 
 log = logging.getLogger("adapters.kick")
 
+# Kick's public Pusher app key / cluster (same socket Stream Core uses).
 PUSHER_URL = (
     "wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679"
     "?protocol=7&client=js&version=8.4.0-rc2&flash=false"
 )
 
+# Kick's API tends to refuse requests that do not look like a browser.
 BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -35,6 +43,8 @@ BROWSER_HEADERS = {
 
 
 class KickAdapter(BaseAdapter):
+    """Listens to one Kick chatroom. Enabled by ``kick.enabled``."""
+
     platform = Platform.KICK
 
     def __init__(self, config: dict, bus):
@@ -79,6 +89,7 @@ class KickAdapter(BaseAdapter):
                 pass
 
     async def _resolve_chatroom_id(self, slug: str) -> Optional[int]:
+        """Try Kick's v2 then v1 channel API; return the chatroom id or None."""
         urls = [
             f"https://kick.com/api/v2/channels/{slug}",
             f"https://kick.com/api/v1/channels/{slug}",
@@ -98,6 +109,7 @@ class KickAdapter(BaseAdapter):
                     cid = chatroom.get("id") or data.get("chatroom_id")
                     if cid:
                         return int(cid)
+                    # Some responses wrap the channel in a "data" object.
                     nested = (data.get("data") or {}).get("chatroom") or {}
                     if nested.get("id"):
                         return int(nested["id"])
@@ -113,10 +125,13 @@ class KickAdapter(BaseAdapter):
                     PUSHER_URL,
                     ping_interval=20,
                     ping_timeout=20,
+                    # Allow messages up to 4 MB.
                     max_size=2**22,
                 ) as ws:
                     log.info("Kick Pusher connected")
                     backoff = 3.0
+                    # Subscribe to both the ".v2" and the plain channel name so either
+                    # Kick format works.
                     await ws.send(json.dumps({
                         "event": "pusher:subscribe",
                         "data": {"auth": "", "channel": f"chatrooms.{self.chatroom_id}.v2"},
@@ -145,6 +160,7 @@ class KickAdapter(BaseAdapter):
             backoff = min(backoff * 1.5, 30.0)
 
     async def _handle_raw(self, raw: str | bytes) -> None:
+        """Keep only chat-message events; Pusher sends ``data`` as a JSON string inside JSON."""
         try:
             msg = json.loads(raw if isinstance(raw, str) else raw.decode("utf-8", "ignore"))
         except json.JSONDecodeError:
@@ -165,6 +181,7 @@ class KickAdapter(BaseAdapter):
             await self._on_chat_message(data)
 
     async def _on_chat_message(self, data: dict[str, Any]) -> None:
+        """Build a ChatEvent from a Kick chat payload (sender, content, identity badges)."""
         sender = data.get("sender") or {}
         username = (
             sender.get("username")

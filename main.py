@@ -5,6 +5,12 @@ Fridge Chat Credits — standalone unique-chatter credits roll.
 Adapters (Twitch / Kick / YouTube / Stream Core ingest) feed an in-process
 bus. The roster keeps one row per (platform, username). An HTML overlay
 renders a configurable end-credits marquee for XSplit / OBS.
+
+Start-up order: load config/config.yaml (core/config.py), build ChatCredits
+(roster + cast + shared AppState), start the enabled adapters, then serve the
+FastAPI app from api/server.py with uvicorn on 127.0.0.1:3854 by default.
+Env overrides: CREDITS_HOST, CREDITS_PORT, and CREDITS_DEMO=1 (seed fake
+names and use a solid black stage for previews).
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ from pathlib import Path
 
 import uvicorn
 
+# Make "core", "adapters" and "api" importable however the script is launched.
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -37,9 +44,13 @@ log = logging.getLogger("main")
 
 
 class ChatCredits:
+    """Owns the bus, roster, cast board and adapters; AppState shares them with the API."""
+
     def __init__(self, config: dict):
         self.config = config
         self.bus = EventBus()
+        # Bot accounts, plus (optionally) the streamer's own channel names, never get a row.
+        # Placeholder names from the example config ("YOUR_..." / "your_...") are skipped.
         ignore = list(config.get("roster", {}).get("ignore_usernames") or [])
         if config.get("roster", {}).get("ignore_own_channel", True):
             kick_slug = (config.get("kick") or {}).get("channel_slug") or ""
@@ -73,6 +84,7 @@ class ChatCredits:
             if (self.state.theme.get("background") or "transparent") == "transparent":
                 self.state.theme["background"] = "#000"
         self.state.play["mode"] = self.state.theme.get("mode") or "loop"
+        # The API's PUT /api/config calls this so ignore-list / look edits apply live.
         self.state.apply_config = self.apply_runtime_config
         self.adapters: dict = {}
         self.state.adapters = self.adapters
@@ -80,7 +92,9 @@ class ChatCredits:
         self._pending_broadcast = False
 
     async def start(self) -> None:
+        """Hook up listeners, start enabled adapters and the periodic save/broadcast task."""
         self.bus.on_chat(self._on_chat)
+        # Only flag here; _persist_loop sends at most one roster broadcast per tick.
         self.roster.on_change(self._mark_broadcast)
 
         twitch_cfg = self.config.get("twitch") or {}
@@ -103,6 +117,7 @@ class ChatCredits:
 
         ingest_cfg = (self.config.get("ingest") or {}).get("stream_core") or {}
         if ingest_cfg.get("enabled"):
+            # Both would read the same Kick chat, so every Kick message would arrive twice.
             if kick_cfg.get("enabled"):
                 log.warning(
                     "Both Kick adapter and Stream Core ingest are on — "
@@ -123,6 +138,7 @@ class ChatCredits:
         )
 
     async def stop(self) -> None:
+        """Cancel the save loop, stop adapters and write the session one last time."""
         if self._save_task:
             self._save_task.cancel()
             try:
@@ -138,6 +154,7 @@ class ChatCredits:
         """Hot-apply ignore list / theme. Adapter toggles still need a restart."""
         self.config = config
         self.state.config = config
+        # Same own-channel rule as __init__; keep the two copies in sync.
         roster_cfg = config.get("roster") or {}
         ignore = list(roster_cfg.get("ignore_usernames") or [])
         if roster_cfg.get("ignore_own_channel", True):
@@ -156,6 +173,7 @@ class ChatCredits:
         self._pending_broadcast = True
 
     async def _on_chat(self, event: ChatEvent) -> None:
+        """Bus handler: add the chatter to the roster and tag paid messages for the cast."""
         self.roster.ingest(event)
         if getattr(event, "is_paid", False) or getattr(event.user, "is_paid", False):
             self.cast.tag_alert("paid", event.platform.value, event.user.username)
@@ -216,6 +234,12 @@ class ChatCredits:
         log.info("Seeded %s demo chatters for preview", len(samples))
 
     async def _persist_loop(self, every: float) -> None:
+        """Every ``every`` seconds (app.save_every_sec): save session.json if changed,
+        then push the new roster to overlays over the WebSocket.
+
+        While the list is frozen (Roll credits) no roster push is sent, so the roll
+        does not reshuffle mid-crawl.
+        """
         while True:
             await asyncio.sleep(every)
             try:
@@ -234,6 +258,7 @@ class ChatCredits:
 
 
 async def _run() -> None:
+    """Load config, set up logging, start the app and serve HTTP until stopped."""
     config = load_config(ROOT)
     level = str(config.get("app", {}).get("log_level") or "INFO").upper()
     logging.basicConfig(
@@ -245,6 +270,7 @@ async def _run() -> None:
     app_core = ChatCredits(config)
     await app_core.start()
 
+    # Env vars win over config.yaml so a launcher can move the app without editing YAML.
     host = os.environ.get("CREDITS_HOST") or config.get("app", {}).get("host") or "127.0.0.1"
     port = int(os.environ.get("CREDITS_PORT") or config.get("app", {}).get("port") or 3854)
     fastapi_app = create_app(app_core.state)
@@ -261,6 +287,7 @@ async def _run() -> None:
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
 
+    # Ctrl+C / SIGTERM: let uvicorn exit cleanly so the finally block saves the session.
     def _ask_stop(*_):
         stop.set()
         server.should_exit = True
@@ -269,6 +296,7 @@ async def _run() -> None:
         try:
             loop.add_signal_handler(sig, _ask_stop)
         except NotImplementedError:
+            # Windows event loops do not support add_signal_handler; skip it there.
             pass
 
     log.info("HTTP on http://%s:%s  overlay /overlay/credits.html", host, port)

@@ -1,23 +1,45 @@
 /* Fridge credits overlay engine.
    Crawl is rAF (OBS/CEF drops CSS keyframe crawls).
    Star Wars: perspective on #stage, rotateX on #sw-world, translateY on #sw-track.
-   Motion changes and Restart always hard-reset so leftover transforms cannot black-screen. */
+   Motion changes and Restart always hard-reset so leftover transforms cannot black-screen.
+
+   Loaded by overlay/credits.html (XSplit / OBS Webpage source). Data comes from
+   api/server.py: GET /api/theme, /api/roster, /api/play at boot (falls back to the
+   /api/credits/* paths so the same file works inside Stream Core), then live
+   updates over /ws as {type: "theme" | "roster" | "play", data}. Query-string
+   parameters override theme keys, e.g. ?columns=1&speed_px_per_sec=28.
+
+   Map of this file:
+     state + helpers        theme / roster / play, the shared `engine` object
+     theme + HTML builders  applyTheme, nameCell, grid, jobRow, titleBlock ...
+     crawl motions          crawl, crawl-down, starwars (one long reel moved in px)
+     page motions           cards, fade, slides, typewriter (reel split into pages)
+     ticker, matrix         horizontal name tape; canvas rain + "decrypting" names
+     main loop              tick -> per-motion tick*, startMotion, paint
+     boot + WebSocket       fetch initial state, then listen on /ws
+
+   Motion ids must match core/look.py ALLOWED_MOTIONS and overlay/credits-editor.js. */
 (function () {
   "use strict";
 
+  // Order of platform blocks when group_by_platform is on.
   const PLATFORM_ORDER = ["twitch", "kick", "youtube", "manual"];
   const PLATFORM_LABEL = { twitch: "Twitch", kick: "Kick", youtube: "YouTube", manual: "Chat" };
+  // Motion families: crawl-type moves one tall reel; page-type shows one page at a time.
   const CRAWL_MOTIONS = { crawl: 1, "crawl-down": 1, starwars: 1 };
   const PAGE_MOTIONS = { cards: 1, fade: 1, slides: 1, typewriter: 1 };
+  // Characters used for the Matrix rain and the scrambled part of names.
   const MATRIX_GLYPHS = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789";
 
   const qs = new URLSearchParams(location.search);
+  // Standalone app paths first, then Stream Core's built-in credits paths.
   const API_THEME = ["/api/theme", "/api/credits/theme"];
   const API_ROSTER = ["/api/roster", "/api/credits/roster"];
   const API_PLAY = ["/api/play", "/api/credits/play"];
   let theme = {};
   let roster = { chatters: [], count: 0 };
   let play = { playing: true, mode: "loop", freeze: false, generation: 0 };
+  // Last-drawn fingerprints; paint() compares against them to skip needless rebuilds.
   let rebuildTimer = 0;
   let lastRosterKey = "";
   let lastThemeKey = "";
@@ -25,6 +47,10 @@
   let lastEnter = "";
   let lastMotionFp = "";
 
+  // All animation state in one place, so hardReset() can wipe it in one go.
+  // y / startY / endY are reel offsets in px; x is the ticker offset in px;
+  // *Until fields are performance.now() timestamps in ms; phase is the current step
+  // (idle, cards, crawl, end, stinger, pages, typewriter, ticker, matrix, empty).
   const engine = {
     raf: 0,
     timers: [],
@@ -64,11 +90,13 @@
     return Number.isFinite(n) ? n : fallback;
   }
 
+  // The theme's motion if the engine knows it, else "crawl".
   function motionId() {
     const m = String(theme.motion || "crawl").toLowerCase();
     return CRAWL_MOTIONS[m] || PAGE_MOTIONS[m] || m === "ticker" || m === "matrix" ? m : "crawl";
   }
 
+  // setTimeout that hardReset() can cancel (ids are kept in engine.timers).
   function later(fn, ms) {
     const id = setTimeout(fn, ms);
     engine.timers.push(id);
@@ -135,10 +163,13 @@
     el.innerHTML = "";
   }
 
+  // Hide the scrolling reel (used while cards / pages / ticker / matrix show instead).
   function parkReel(on) {
     $("sw-world").classList.toggle("parked", !!on);
   }
 
+  // Remove transforms / opacity left by any motion. The offsetHeight read forces
+  // a reflow so the "transition: none" applies before transitions come back.
   function clearInlineMotion() {
     const track = $("sw-track");
     const world = $("sw-world");
@@ -168,6 +199,8 @@
     drop.forEach((c) => document.body.classList.remove(c));
   }
 
+  // Stop everything and return to a blank, idle stage. Called before any motion
+  // change or restart so the old motion's leftovers cannot hide the new one.
   function hardReset() {
     stopRaf();
     clearTimers();
@@ -205,6 +238,8 @@
     lastMotionFp = "";
   }
 
+  // Overlay URL query parameters win over server theme keys ("true"/"false" and
+  // numbers are converted). ?demo is ignored here.
   function applyQuery(t) {
     const out = Object.assign({}, t);
     qs.forEach((v, k) => {
@@ -217,6 +252,8 @@
     return out;
   }
 
+  // Letterbox / grain / vignette: an explicit theme value wins; otherwise movie
+  // casts may turn them on via roster.cast.look (sent by Stream Core's cast).
   function movieLook() {
     const look = (roster.cast && roster.cast.look) || {};
     const movie = (roster.style || theme.style) === "movie";
@@ -227,6 +264,7 @@
     };
   }
 
+  // Push the look into CSS variables on <html> (used by credits.css) and body classes.
   function applyTheme(t) {
     theme = applyQuery(t || {});
     const r = document.documentElement.style;
@@ -266,6 +304,7 @@
     }
   }
 
+  // HTML-escape for anything built into markup strings below (chat names are untrusted).
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (ch) {
       if (ch === "&") return "\u0026amp;";
@@ -280,6 +319,8 @@
     return String((c && (c.display_name || c.username)) || "").replace(/^@+/, "");
   }
 
+  // One name in a grid. opts.tw = typewriter mode: the text goes in data-text and is
+  // typed in later by typewriterAdvance().
   function nameCell(c, opts) {
     opts = opts || {};
     const showPlat = theme.show_platform !== false;
@@ -319,6 +360,7 @@
       "</div>";
   }
 
+  // Four or more job rows use the multi-column layout.
   function crewBlock(rows, opts) {
     if (rows.length >= 4) {
       return '<div class="crew-cols">' + rows.map(function (r) { return jobRow(r, opts); }).join("") + "</div>";
@@ -361,6 +403,7 @@
     return '<div class="footer">' + esc(footer) + "</div>";
   }
 
+  // Fingerprint of what is on screen; a change means the reel must be rebuilt.
   function rosterKey(r) {
     const jobs = (r.chatters || []).map(function (c) { return c.job || ""; }).join(",");
     const cards = ((r.cast && r.cast.cards) || []).map(function (c) { return c.line; }).join(",");
@@ -368,6 +411,8 @@
       (r.chatters || []).map(function (c) { return c.platform + ":" + c.username; }).join("|");
   }
 
+  // Theme keys that change layout. Keep in sync when adding a look setting that
+  // changes the markup.
   function themeKey(t) {
     return [
       t.title, t.subtitle, t.footer, t.section_label, t.columns, t.sort,
@@ -380,6 +425,7 @@
     ].join("~");
   }
 
+  // Settings that need a full restart of the motion when they change.
   function motionFingerprint(t) {
     t = t || theme;
     return [
@@ -400,6 +446,8 @@
     return Math.max(1, Math.min(4, num(theme.columns, 2)));
   }
 
+  // Movie style: departments (job rows), groups, overflow. starring, thanks and
+  // legal come from Stream Core's cast; this app's core/cast.py does not send them.
   function renderMovieBody(opts) {
     const cast = roster.cast;
     if (!cast) return "";
@@ -441,6 +489,7 @@
     return html;
   }
 
+  // Names style: one labelled grid, or one block per platform.
   function renderNamesBody(opts) {
     const chatters = roster.chatters || [];
     const label = theme.section_label || "Chatters";
@@ -467,6 +516,8 @@
     $("reel").innerHTML = titleBlock({}) + renderNamesBody({}) + footerBlock({});
   }
 
+  // How many names fit on one page: rows that fit in ~58% of the stage height
+  // (4..12 rows) times the column count.
   function namesPerPage() {
     const c = cols();
     const namePx = num(theme.name_size_px, 22);
@@ -487,6 +538,8 @@
     return '<div class="page">' + inner + "</div>";
   }
 
+  // Split the credits into page HTML strings for the page motions and typewriter.
+  // The title is put on the first page; the footer gets its own last page.
   function buildPages(tw) {
     const opts = { tw: !!tw };
     const movie = isMovie();
@@ -580,6 +633,7 @@
     return (roster.cast && roster.cast.cards) || [];
   }
 
+  // "clear" mode, or "once" with clear_when_done, empties the stage at the end.
   function wantsClear(mode) {
     return mode === "clear" || (mode === "once" && !!theme.clear_when_done);
   }
@@ -598,6 +652,7 @@
     stopRaf();
   }
 
+  // Full-screen opening card (cast.cards, from Stream Core's cast) before the crawl.
   function showCard(card) {
     parkReel(true);
     const wrap = $("cards");
@@ -621,6 +676,7 @@
     }
   }
 
+  // Optional after-credits card (cast.stinger). Returns false when there is none.
   function showStinger() {
     const st = roster.cast && roster.cast.stinger;
     if (!st) return false;
@@ -632,6 +688,7 @@
     return true;
   }
 
+  // Measure without the Star Wars tilt, which would distort scrollHeight.
   function measureReelHeight() {
     const world = $("sw-world");
     const reel = $("reel");
@@ -641,6 +698,8 @@
     return height;
   }
 
+  // Start and end reel offsets (px) for the current crawl motion; the letterbox
+  // bars (7.5% of the stage) are kept clear.
   function metrics() {
     const stageH = ($("stage") && $("stage").clientHeight) || window.innerHeight || 720;
     const lb = movieLook().letterbox ? stageH * 0.075 : 0;
@@ -676,6 +735,7 @@
     $("sw-track").style.transform = "translate3d(0," + y + "px,0)";
   }
 
+  // Where to park the reel when paused or at the end: centred if it fits, else near the top.
   function holdY() {
     const m = metrics();
     if (m.height <= m.stageH * 0.92) {
@@ -684,6 +744,7 @@
     return 48;
   }
 
+  // name_enter effects: add class "in" to each name as it scrolls into view.
   function bindEnters() {
     stopObserver();
     const enter = String(theme.name_enter || "none");
@@ -743,6 +804,7 @@
     return openingCards().reduce(function (n, c) { return n + num(c.hold_sec, 2.8); }, 0);
   }
 
+  // Reel reached the end: hold / stop / clear for "once", or loop.
   function finishCrawl(ts) {
     const mode = play.mode || theme.mode || "loop";
     const endHold = num(roster.cast && roster.cast.end_hold_sec, 0);
@@ -766,6 +828,7 @@
     loopCrawl(ts);
   }
 
+  // Back to the start. Star Wars fades out and in (380 ms each) instead of jumping.
   function loopCrawl(ts) {
     const gap = Math.max(0, num(theme.gap_after_loop_sec, 2.5));
     if (engine.motion === "starwars") {
@@ -792,6 +855,9 @@
     if (openingCards().length) startCards(ts);
   }
 
+  // One frame of a crawl motion. Speed is speed_px_per_sec, unless duration_sec is
+  // set: then speed is chosen so the crawl (minus card / end holds) takes that long.
+  // dt is capped at 50 ms so a stalled frame does not make the reel jump.
   function tickCrawl(ts) {
     if (engine.phase === "cards") {
       const list = openingCards();
@@ -848,6 +914,7 @@
     applyY(engine.y);
   }
 
+  // After the end hold / stinger: clear, stop ("once" turns into "hold"), or start over.
   function afterSequence(ts) {
     const mode = play.mode || theme.mode || "loop";
     if (wantsClear(mode)) clearStage();
@@ -861,6 +928,7 @@
     }
   }
 
+  // How long each page stays up, in ms (page_hold_sec, at least 0.8 s).
   function pageHoldMs() {
     return Math.max(800, num(theme.page_hold_sec, 4.2) * 1000);
   }
@@ -889,6 +957,7 @@
     showPage(0, -1);
   }
 
+  // Show the next page, or at the last page clear / stop / go back to page 1.
   function nextPageOrLoop(ts) {
     const mode = play.mode || theme.mode || "loop";
     const n = engine.pages.length;
@@ -956,6 +1025,8 @@
     el.appendChild(caret);
   }
 
+  // Type up to `chars` more characters across the page's .tw-line elements.
+  // Returns "done", "typing", or "line-break" (unit "line" pauses after each line).
   function typewriterAdvance(chars) {
     const lines = engine.typeLines;
     if (!lines.length) return "done";
@@ -984,6 +1055,8 @@
     return "typing";
   }
 
+  // typeState: "typing" -> ("line-pause" 280 ms between lines) -> "hold" for
+  // pageHoldMs, then the next page. Speed is typewriter_cps characters per second.
   function tickTypewriter(ts) {
     if (engine.phase !== "typewriter") return;
     if (engine.typeState === "hold") {
@@ -1038,6 +1111,7 @@
     }
   }
 
+  // Horizontal name tape. The content is written twice so it can wrap seamlessly.
   function startTicker() {
     const el = $("ticker");
     const chatters = roster.chatters || [];
@@ -1061,6 +1135,7 @@
     el.style.transform = "translate3d(" + engine.x + "px,-50%,0)";
   }
 
+  // Scroll left at 1.8x speed_px_per_sec; jump back by half the width to loop.
   function tickTicker(ts) {
     if (!engine.lastTs) engine.lastTs = ts;
     const dt = Math.min(0.05, (ts - engine.lastTs) / 1000);
@@ -1073,6 +1148,8 @@
     el.style.transform = "translate3d(" + engine.x + "px,-50%,0)";
   }
 
+  // Matrix effect: the first part of the name is "locked in" over lockMs ms, the
+  // rest shows changing glyphs.
   function decryptName(full, t, lockMs) {
     const n = full.length;
     const locked = Math.min(n, Math.floor((t / lockMs) * n));
@@ -1083,6 +1160,8 @@
     return out;
   }
 
+  // Matrix motion: falling glyph rain on the canvas, with sections of names
+  // (departments / groups, or pages of chatters) shown one at a time on top.
   function startMatrix() {
     const canvas = $("matrix");
     canvas.classList.remove("hidden");
@@ -1139,6 +1218,7 @@
     renderMatrixBoard(true);
   }
 
+  // Fit the canvas to the stage; matrix_density (0.4..2.2) sets the glyph size.
   function resizeMatrix() {
     const m = engine.matrix;
     if (!m) return;
@@ -1177,6 +1257,8 @@
     }
   }
 
+  // Draw one rain frame (a translucent black fill leaves fading trails), update
+  // the names, and move to the next section after pageHoldMs.
   function tickMatrix(ts) {
     const m = engine.matrix;
     if (!m || !m.ctx) return;
@@ -1223,6 +1305,7 @@
     }
   }
 
+  // Start the current motion again from the top (used when looping).
   function restartCurrent(ts) {
     const motion = engine.motion;
     if (CRAWL_MOTIONS[motion]) {
@@ -1238,6 +1321,7 @@
     else if (motion === "matrix") startMatrix();
   }
 
+  // requestAnimationFrame loop. Does nothing while paused or in "hold" mode.
   function tick(ts) {
     if (!engine.running) return;
     engine.raf = requestAnimationFrame(tick);
@@ -1259,6 +1343,8 @@
     engine.raf = requestAnimationFrame(tick);
   }
 
+  // Start the theme's motion from scratch. When paused, the first frame is drawn
+  // and held instead of starting the loop.
   function startMotion() {
     const motion = motionId();
     engine.motion = motion;
@@ -1320,6 +1406,10 @@
     engine.started = true;
   }
 
+  // Called for every theme / roster / play update. A motion change, a new play
+  // generation (desk "Restart") or opts.reset does a hard reset. Otherwise only the
+  // content is rebuilt, and a running crawl keeps its position, so new chatters do
+  // not jump the roll back to the top.
   function paint(opts) {
     opts = opts || {};
     const motion = motionId();
@@ -1362,11 +1452,13 @@
     }
   }
 
+  // Debounce: several WS messages arrive together (play + roster), paint once.
   function schedulePaint(opts) {
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(function () { paint(opts || {}); }, 40);
   }
 
+  // GET the first path that answers OK, as JSON; null if none do.
   async function fetchFirst(paths) {
     for (let i = 0; i < paths.length; i++) {
       try {
@@ -1377,6 +1469,7 @@
     return null;
   }
 
+  // Initial load, then live updates over the WebSocket.
   async function boot() {
     try {
       const pack = await Promise.all([
@@ -1394,6 +1487,8 @@
     connectWs();
   }
 
+  // Accepts both this app's message names and Stream Core's credits_* names.
+  // Reconnects every 2 s if the app restarts.
   function connectWs() {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(proto + "://" + location.host + "/ws");
@@ -1418,6 +1513,7 @@
     ws.onclose = function () { setTimeout(connectWs, 2000); };
   }
 
+  // Recompute crawl bounds when the source is resized.
   window.addEventListener("resize", function () {
     if (engine.motion === "matrix") resizeMatrix();
     if (!CRAWL_MOTIONS[engine.motion]) return;

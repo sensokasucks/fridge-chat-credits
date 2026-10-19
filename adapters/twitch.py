@@ -1,4 +1,9 @@
-"""Twitch chat over anonymous IRC. No OAuth needed for read-only listen."""
+"""Twitch chat over anonymous IRC. No OAuth needed for read-only listen.
+
+Logs in as a random ``justinfanNNNNN`` nick (Twitch's anonymous read-only
+login), joins ``twitch.channel`` from config.yaml and emits one ChatEvent per
+PRIVMSG. Reconnects with a growing back-off (3 s up to 30 s).
+"""
 
 from __future__ import annotations
 
@@ -13,15 +18,18 @@ from core.models import ChatEvent, ChatUser, Platform
 
 log = logging.getLogger("adapters.twitch")
 
+# Plain-text IRC port (no TLS); fine for read-only, public chat.
 HOST = "irc.chat.twitch.tv"
 PORT = 6667
 
+# One chat line: optional "@tags " prefix, sender nick, channel, message text.
 PRIVMSG_RE = re.compile(
     r"^(?:@(?P<tags>[^ ]+) )?:(?P<nick>[^!]+)![^ ]+ PRIVMSG #(?P<chan>[^ ]+) :(?P<msg>.*)$"
 )
 
 
 def _parse_tags(raw: str) -> dict[str, str]:
+    """Parse IRCv3 tags ("a=1;b=2") into a dict; ``\\s`` in values means a space."""
     out: dict[str, str] = {}
     if not raw:
         return out
@@ -35,6 +43,8 @@ def _parse_tags(raw: str) -> dict[str, str]:
 
 
 class TwitchAdapter(BaseAdapter):
+    """Listens to one Twitch channel's chat. Enabled by ``twitch.enabled``."""
+
     platform = Platform.TWITCH
 
     def __init__(self, config: dict, bus):
@@ -70,6 +80,7 @@ class TwitchAdapter(BaseAdapter):
                 pass
 
     async def _loop(self) -> None:
+        # Seconds to wait before reconnecting; reset after a good connect.
         backoff = 3.0
         nick = f"justinfan{random.randint(10000, 99999)}"
         while self._running:
@@ -78,6 +89,7 @@ class TwitchAdapter(BaseAdapter):
                 self._writer = writer
                 writer.write(
                     (
+                        # Ask for tags so we get display-name, badges, color, bits.
                         "CAP REQ :twitch.tv/tags twitch.tv/commands\r\n"
                         f"NICK {nick}\r\n"
                         f"JOIN #{self.channel}\r\n"
@@ -109,6 +121,7 @@ class TwitchAdapter(BaseAdapter):
             backoff = min(backoff * 1.5, 30.0)
 
     async def _on_line(self, writer: asyncio.StreamWriter, line: str) -> None:
+        """Answer server PINGs (or Twitch drops us) and turn PRIVMSG lines into ChatEvents."""
         if not line:
             return
         if line.startswith("PING"):
@@ -129,9 +142,11 @@ class TwitchAdapter(BaseAdapter):
             id=tags.get("user-id") or nick,
             username=nick,
             display_name=display,
+            # The broadcaster counts as a mod so highlight_mods gilds them too.
             is_mod=tags.get("mod") == "1" or "moderator" in badge_names or "broadcaster" in badge_names,
             is_vip="vip" in badge_names,
             is_subscriber=tags.get("subscriber") == "1" or "subscriber" in badge_names,
+            # A "bits" tag means the message was a cheer.
             is_paid=bool(tags.get("bits")),
             badges=badge_names,
             color=tags.get("color") or None,

@@ -11,6 +11,12 @@ Two modes (config youtube.mode):
 
 Default mode is innertube when no api_key is set; official when api_key is present
 unless mode is forced.
+
+Both modes poll (there is no push socket): the wait between polls comes from
+YouTube's own hint (pollingIntervalMillis / timeoutMs), never below 2 s, and
+8 s after an error (15 s after an API 403). Message ids are remembered so a message seen twice is only
+counted once. ``mode`` and ``channel_id`` are optional keys under ``youtube:``
+in config.yaml (they are not in core/config.py DEFAULTS); channel_id is unused.
 """
 
 from __future__ import annotations
@@ -28,10 +34,12 @@ from core.models import ChatEvent, ChatUser, Platform
 
 log = logging.getLogger("adapters.youtube")
 
+# Data API endpoints (official mode) and the website's own chat endpoint (innertube mode).
 VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
 CHAT_URL = "https://www.googleapis.com/youtube/v3/liveChat/messages"
 INNERTUBE_CHAT_URL = "https://www.youtube.com/youtubei/v1/live_chat/get_live_chat"
 
+# Innertube pages and endpoints expect a normal desktop browser.
 BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -43,6 +51,8 @@ BROWSER_HEADERS = {
 
 
 class YouTubeAdapter(BaseAdapter):
+    """Polls one live video's chat. Enabled by ``youtube.enabled``."""
+
     platform = Platform.YOUTUBE
 
     def __init__(self, config: dict, bus):
@@ -68,6 +78,7 @@ class YouTubeAdapter(BaseAdapter):
         self._stop = asyncio.Event()
         self._page_token = ""
         self._seen_ids: set[str] = set()
+        # Recent message ids, for de-duplication across polls (trimmed in _remember).
         self._seen_max = 500
 
     async def start(self) -> None:
@@ -145,6 +156,7 @@ class YouTubeAdapter(BaseAdapter):
                     pass
 
     async def _resolve_chat_id(self, client: httpx.AsyncClient) -> str:
+        """Look up the video's activeLiveChatId (needs the stream to be live)."""
         r = await client.get(
             VIDEOS_URL,
             params={
@@ -161,6 +173,7 @@ class YouTubeAdapter(BaseAdapter):
         return details.get("activeLiveChatId") or ""
 
     async def _poll_official(self, client: httpx.AsyncClient) -> float:
+        """Fetch one page of new messages; return seconds to wait before the next poll."""
         params: dict[str, Any] = {
             "liveChatId": self.live_chat_id,
             "part": "snippet,authorDetails",
@@ -172,6 +185,7 @@ class YouTubeAdapter(BaseAdapter):
         r = await client.get(CHAT_URL, params=params)
         if r.status_code == 403:
             log.error("YouTube API 403 — check api_key / quota / liveChatId")
+            # Back off longer on 403: retrying fast would only burn more quota.
             return 15.0
         r.raise_for_status()
         data = r.json()
@@ -182,6 +196,7 @@ class YouTubeAdapter(BaseAdapter):
         return max(2.0, interval_ms / 1000.0)
 
     async def _on_official_item(self, item: dict) -> None:
+        """Turn one Data API liveChatMessage into a ChatEvent (Super Chats marked paid)."""
         mid = str(item.get("id") or "")
         if mid and mid in self._seen_ids:
             return
@@ -200,6 +215,7 @@ class YouTubeAdapter(BaseAdapter):
             username=name,
             display_name=name,
             is_mod=bool(author.get("isChatModerator") or author.get("isChatOwner")),
+            # A channel member ("sponsor") counts as both VIP and subscriber here.
             is_vip=bool(author.get("isChatSponsor")),
             is_subscriber=bool(author.get("isChatSponsor")),
             is_paid=False,
@@ -324,6 +340,7 @@ class YouTubeAdapter(BaseAdapter):
         return api_key, continuation, client_version
 
     def _find_continuation(self, obj: Any, depth: int = 0) -> Optional[str]:
+        """Search a ytInitialData dict (max 12 levels deep) for a chat continuation token."""
         if depth > 12:
             return None
         if isinstance(obj, dict):
@@ -353,6 +370,11 @@ class YouTubeAdapter(BaseAdapter):
         continuation: str,
         client_version: str,
     ) -> tuple[str, float]:
+        """POST one get_live_chat request; return (next continuation token, seconds to wait).
+
+        Each response hands out the token for the next request; if none comes back the
+        old one is reused.
+        """
         body = {
             "context": {
                 "client": {
@@ -406,6 +428,11 @@ class YouTubeAdapter(BaseAdapter):
         return next_cont, interval
 
     async def _on_innertube_action(self, action: dict) -> None:
+        """Turn one innertube chat action into a ChatEvent.
+
+        Handles text, Super Chat, Super Sticker and membership items. Paid items get
+        the amount prefixed to the message text, e.g. "[$5.00] hello".
+        """
         item = (action.get("addChatItemAction") or {}).get("item")
         if not item:
             replay = action.get("replayChatItemAction") or {}
@@ -461,6 +488,7 @@ class YouTubeAdapter(BaseAdapter):
             elif tip:
                 badges.append(tip)
 
+        # paid / currency are not used yet.
         paid = None
         currency = None
         is_paid = "liveChatPaidMessageRenderer" in item or "liveChatPaidStickerRenderer" in item
@@ -498,6 +526,7 @@ class YouTubeAdapter(BaseAdapter):
 
     @staticmethod
     def _runs_to_text(node: Any) -> str:
+        """Flatten YouTube's text "runs" into plain text; emojis become their :shortcut:."""
         if not isinstance(node, dict):
             return ""
         if "simpleText" in node:

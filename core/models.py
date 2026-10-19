@@ -1,4 +1,9 @@
-"""Normalized chat types shared by every adapter."""
+"""Normalized chat types shared by every adapter.
+
+ChatUser / ChatEvent are what adapters build from a platform message.
+Chatter is one row in the roster (core/roster.py); its to_dict() shape is
+what data/session.json stores and what the overlay receives as ``chatters``.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,7 @@ from typing import Any, Optional
 import time
 
 
+# The string values are what JSON, the overlay and "platform:username" keys use.
 class Platform(str, Enum):
     KICK = "kick"
     TWITCH = "twitch"
@@ -17,6 +23,8 @@ class Platform(str, Enum):
 
 @dataclass
 class ChatUser:
+    """Who sent a message, as reported by the platform."""
+
     platform: Platform
     id: str
     username: str
@@ -29,6 +37,8 @@ class ChatUser:
     color: Optional[str] = None
 
     def __post_init__(self):
+        # The display name keeps its case; username is lowercased because it is
+        # part of the roster identity (platform, username).
         if not self.display_name:
             self.display_name = self.username
         self.username = (self.username or "").lower().strip()
@@ -41,6 +51,8 @@ class ChatUser:
 
 @dataclass
 class ChatEvent:
+    """One chat message. ``timestamp`` is Unix seconds; ``raw`` keeps the platform payload."""
+
     platform: Platform
     user: ChatUser
     message: str
@@ -72,6 +84,7 @@ class Chatter:
     is_subscriber: bool = False
     is_paid: bool = False
 
+    # Roster dict key, e.g. "twitch:somebody". Matches Roster.ingest().
     @property
     def key(self) -> str:
         return f"{self.platform}:{self.username}"
@@ -79,6 +92,7 @@ class Chatter:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    # Rebuild a Chatter from session.json; missing fields get safe defaults.
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Chatter":
         return cls(
