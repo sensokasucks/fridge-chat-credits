@@ -3,12 +3,21 @@
 Admin → Credits (Stream Core) and the Chat Credits control desk both edit
 these keys live. The overlay (`overlay/credits.js`) reads the same shape.
 Keep this module import-light — config.py and credits.py both load it.
+
+In this repo it is imported by core/config.py (``credits:`` defaults) and
+api/server.py (load_theme). Units are in the key names: px, sec, ms, em, deg.
+Note: this overlay does not read every key here. Star Wars, page and typewriter
+timing use sw_tilt_deg / sw_perspective_px / page_hold_sec / page_fade_sec /
+typewriter_cps (see core/look.py NUM_FIELDS), not tilt_deg / perspective_px /
+page_duration_sec / page_transition_ms / type_ms. Several Type / Color / Layout
+keys (weights, glow, uppercase_*, align ...) are likewise not used by overlay/credits.js.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+# Default value of every look key. The desk's "Save look" writes overrides to data/theme.json.
 LOOK_DEFAULTS: dict[str, Any] = {
     # Copy
     "title": "Thanks for watching",
@@ -24,9 +33,11 @@ LOOK_DEFAULTS: dict[str, Any] = {
     "highlight_mods": True,
     "highlight_vips": False,
     # Playback
+    # crawl speed in real pixels per second; duration_sec > 0 overrides it
     "speed_px_per_sec": 42,
     "duration_sec": 0,
     "gap_after_loop_sec": 2.5,
+    # loop | once | hold (playback mode; /api/play can change it at runtime)
     "mode": "loop",
     # Motion
     "motion": "crawl",
@@ -77,11 +88,13 @@ LOOK_DEFAULTS: dict[str, Any] = {
     "align": "center",
     "job_layout": "dots",
     # Cast
+    # "names" or a config/cast/*.json style id (see core/cast.py)
     "style_id": "names",
     "command_permission": "mod",
 }
 
 # Motions the overlay actually implements. Editor uses the same ids.
+# Note: core/look.py ALLOWED_MOTIONS and the overlay also support "matrix".
 MOTION_IDS = (
     "crawl",
     "crawl-down",

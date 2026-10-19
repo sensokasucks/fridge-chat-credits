@@ -2,6 +2,10 @@
 
 Persists to a small JSON file so a crash does not wipe the credits list.
 Identity is (platform, username) — same person on two platforms is two lines.
+
+main.py creates one Roster, feeds it every chat message via ingest(), and
+saves it every few seconds with save_if_dirty(). api/server.py reads
+snapshot() for the overlay, the desk and the CSV export.
 """
 
 from __future__ import annotations
@@ -18,6 +22,8 @@ log = logging.getLogger("core.roster")
 
 
 class Roster:
+    """The session's unique chatters, keyed by "platform:username"."""
+
     def __init__(self, path: Path, ignore: list[str], min_len: int = 1):
         self.path = path
         self.ignore = {n.lower().strip() for n in ignore if n}
@@ -27,9 +33,11 @@ class Roster:
         self._dirty = False
         self._on_change: list[Callable] = []
 
+    # Callbacks run when a NEW chatter is added or the roster is reset (not on every message).
     def on_change(self, fn: Callable) -> None:
         self._on_change.append(fn)
 
+    # Restore the previous session (started_at + chatters) after a restart or crash.
     def load(self) -> None:
         if not self.path.exists():
             return
@@ -48,6 +56,7 @@ class Roster:
                 continue
         log.info("Loaded session: %s unique chatters", len(self.chatters))
 
+    # Write to a .tmp file then rename, so a crash mid-write cannot corrupt session.json.
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -64,6 +73,7 @@ class Roster:
         if self._dirty:
             self.save()
 
+    # Empty the list and start a new session (desk "Reset session").
     def reset(self) -> None:
         self.chatters.clear()
         self.started_at = time.time()
@@ -73,6 +83,11 @@ class Roster:
         log.info("Session roster reset")
 
     def ingest(self, event: ChatEvent) -> Optional[Chatter]:
+        """Count a message. Returns the new Chatter for a first-time chatter, else None.
+
+        Skips empty names, ignored names and messages shorter than roster.min_message_length.
+        Repeat messages only update last_seen / counts / flags (these do not fire on_change).
+        """
         user = event.user
         if not user.username:
             return None
@@ -131,6 +146,7 @@ class Roster:
             out[c.platform] = out.get(c.platform, 0) + 1
         return out
 
+    # Sort keys match the ``sort`` look setting: first_seen (default), name, last_seen, messages.
     def list_chatters(self, sort: str = "first_seen") -> list[Chatter]:
         items = list(self.chatters.values())
         if sort == "name":
@@ -143,6 +159,7 @@ class Roster:
             items.sort(key=lambda c: c.first_seen)
         return items
 
+    # Dict sent to the overlay / desk: started_at, count, by_platform, chatters (list of dicts).
     def snapshot(self, sort: str = "first_seen") -> dict:
         items = self.list_chatters(sort)
         return {

@@ -3,12 +3,17 @@
 Keep this list in lockstep with overlay/credits-editor.js MOTIONS / FIELDS.
 If a motion id is missing here, the overlay falls back to a crawl and
 Matrix / Teletype look like "Classic with different colors."
+
+sanitize_look() turns any posted look dict into one with known motion / sort
+ids and numbers clamped to safe ranges. In this repo only core/test_look.py
+imports it; the PUT /api/theme route in api/server.py does not call it.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+# Motion ids the overlay (overlay/credits.js) can play. Unknown ids become "crawl".
 ALLOWED_MOTIONS = (
     "crawl",
     "crawl-down",
@@ -21,11 +26,13 @@ ALLOWED_MOTIONS = (
     "matrix",
 )
 
+# Per-name entrance effect, typewriter chunk size, and roster sort orders.
 ALLOWED_ENTERS = ("none", "rise", "fade", "blur")
 ALLOWED_TYPE_UNITS = ("line", "card", "page")
 ALLOWED_SORTS = ("first_seen", "name", "messages", "last_seen")
 
 # Floor / ceiling so a bad editor value cannot freeze the overlay.
+# Each entry is key: (min, max, default). Units are in the key name (px, sec, em, deg).
 NUM_FIELDS = {
     "columns": (1, 4, 2),
     "speed_px_per_sec": (8, 240, 42),
@@ -45,6 +52,7 @@ NUM_FIELDS = {
     "matrix_density": (0.4, 2.2, 1.0),
 }
 
+# Copied through as booleans only when present in the input.
 BOOL_FIELDS = (
     "group_by_platform",
     "show_platform",
@@ -58,6 +66,7 @@ BOOL_FIELDS = (
     "clear_when_done",
 )
 
+# Copied through as strings only when present (colors are CSS color strings).
 TEXT_FIELDS = (
     "title",
     "subtitle",
@@ -75,6 +84,7 @@ TEXT_FIELDS = (
 
 
 def _num(raw: Any, lo: float, hi: float, default: float) -> float:
+    """Parse ``raw`` as a number clamped to lo..hi; ``default`` if it is not a number."""
     try:
         n = float(raw)
     except (TypeError, ValueError):
@@ -144,6 +154,7 @@ def sanitize_look(raw: Any) -> dict[str, Any]:
 
 
 def merge_look(base: Any, patch: Any) -> dict[str, Any]:
+    """Apply ``patch`` over ``base`` and sanitize the result."""
     merged = dict(base or {})
     merged.update(patch or {})
     return sanitize_look(merged)

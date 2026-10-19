@@ -19,6 +19,10 @@ and pass. Extra names can be allowed with ``core.allowed_hosts`` /
 
 Also resolves the admin token: a placeholder like ``change-me`` is never
 accepted — Core generates a random one in ``data/admin_token.txt``.
+
+In Chat Credits the settings live under ``app:`` (``LocalGuard(config, section="app")``).
+Note: at the moment api/server.py does not install LocalGuardMiddleware, and its
+CORS setting allows any origin (see checklists/chat-credits.md for the intended setup).
 """
 
 from __future__ import annotations
@@ -33,8 +37,10 @@ from urllib.parse import urlsplit
 
 log = logging.getLogger("core.local_guard")
 
+# Host names that always count as "this machine".
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+# Example-config tokens that must never unlock the admin API.
 PLACEHOLDER_TOKENS = {"", "change-me", "changeme", "your_admin_token", "YOUR_ADMIN_TOKEN"}
 
 # CORS: only our own loopback pages (any port — sibling Fridge apps).
@@ -43,6 +49,7 @@ _LOOPBACK_ORIGIN_RE = re.compile(LOOPBACK_ORIGIN_REGEX, re.IGNORECASE)
 
 
 def _host_only(value: str) -> str:
+    """'localhost:3854' -> 'localhost'; '[::1]:3854' -> '[::1]' (lowercased)."""
     value = (value or "").strip().lower()
     if value.startswith("["):
         end = value.find("]")
@@ -51,6 +58,7 @@ def _host_only(value: str) -> str:
 
 
 def _norm_list(items: Optional[Iterable]) -> list[str]:
+    """Config value (str or list) -> lowercased list without trailing slashes."""
     if not items:
         return []
     if isinstance(items, str):
@@ -59,6 +67,8 @@ def _norm_list(items: Optional[Iterable]) -> list[str]:
 
 
 class LocalGuard:
+    """Decides whether a request's Host / Origin headers look like they came from this machine."""
+
     def __init__(self, config: dict | None = None, section: str = "core"):
         self.section = section
         self.configure(config or {})
@@ -110,6 +120,7 @@ class LocalGuard:
         return None
 
     def check_ws(self, headers) -> Optional[str]:
+        """Like check(), but a WebSocket must also pass the Origin test (browsers send one)."""
         if not self.host_ok(headers.get("host")):
             return "host not allowed"
         if not self.origin_ok(headers.get("origin")):
@@ -157,6 +168,7 @@ class LocalGuardMiddleware:
 # ----------------------------------------------------------------------
 
 def is_placeholder_token(token: Optional[str]) -> bool:
+    """True for empty or example tokens like ``change-me`` (case-insensitive)."""
     t = str(token or "").strip()
     return t in PLACEHOLDER_TOKENS or t.lower() in {p.lower() for p in PLACEHOLDER_TOKENS}
 
@@ -190,6 +202,7 @@ def resolve_admin_token(config: dict, root: Path, *, create: bool = True) -> str
 
 
 def token_matches(given: Optional[str], expected: str) -> bool:
+    """Constant-time compare (hmac) so the token cannot be guessed by timing."""
     if not given or not expected or is_placeholder_token(expected):
         return False
     return hmac.compare_digest(str(given).encode("utf-8"), expected.encode("utf-8"))

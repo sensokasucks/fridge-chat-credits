@@ -1,7 +1,18 @@
-/* Shared credits look editor. Host passes theme/play URLs. */
+/* Shared credits look editor. Host passes theme/play URLs.
+
+   The tabbed style editor (Motion / Copy / Type / Color / Layout / List) with
+   presets. overlay/control.html mounts it with
+     CreditsEditor.mount({ el, themeUrl: "/api/theme", playUrl: "/api/play" })
+   The `core` option (chat-announce / clear-when-done checkboxes) and the
+   `headers` option (X-Admin-Token) are for when Stream Core's admin uses this file.
+
+   Every edit is sent as PUT themeUrl with persist:false (live preview, not saved);
+   "Save look" and presets send persist:true (saved to data/theme.json).
+   Keep MOTIONS / FIELDS in lockstep with core/look.py and overlay/credits.js. */
 (function (global) {
   "use strict";
 
+  // Motion picker entries. id must be a motion overlay/credits.js implements.
   const MOTIONS = [
     { id: "crawl", label: "Crawl up", blurb: "Classic rolling titles", icon: "crawl-up" },
     { id: "crawl-down", label: "Crawl down", blurb: "Start at the top", icon: "crawl-down" },
@@ -14,6 +25,7 @@
     { id: "matrix", label: "Matrix", blurb: "Rain + name decode", icon: "matrix" },
   ];
 
+  // One-click looks. Each theme is merged over the current editor values, then saved.
   const PRESETS = [
     {
       id: "classic",
@@ -248,6 +260,8 @@
     },
   ];
 
+  // Theme keys the editor reads and writes: [key, "text" | "num" | "bool"].
+  // Each key needs a matching data-k input in template() below.
   const FIELDS = [
     ["title", "text"],
     ["subtitle", "text"],
@@ -293,6 +307,7 @@
     ["clear_when_done", "bool"],
   ];
 
+  // Build one element from an HTML string (not used by mount()).
   function h(html) {
     const t = document.createElement("template");
     t.innerHTML = html.trim();
@@ -319,6 +334,7 @@
     }).join("");
   }
 
+  // Editor markup. core = true adds options only Stream Core's credits use.
   function template(core) {
     return [
       '<div class="crd-ed">',
@@ -432,6 +448,8 @@
     ].join("\n");
   }
 
+  // opts: { el, themeUrl, playUrl, core?, headers? (object or function) }.
+  // Returns { fill(theme), collect() } so the host page can push theme updates in.
   function mount(opts) {
     const root = opts.el;
     if (!root) return;
@@ -470,6 +488,7 @@
       return hds;
     }
 
+    // Stream Core's admin API also accepts the token as ?admin_token=...
     function withAuth(url) {
       const hds = headers();
       const t = hds["X-Admin-Token"] || hds["x-admin-token"] || "";
@@ -482,6 +501,7 @@
       return ed.querySelector("[data-k=\"" + k + "\"]");
     }
 
+    // Copy a theme dict into the inputs. Platform dots and mod highlight default on.
     function fill(t) {
       theme = t || {};
       FIELDS.forEach(function (pair) {
@@ -498,6 +518,7 @@
       markMotion();
     }
 
+    // Read the inputs back into a theme dict (the PUT body).
     function collect() {
       const body = {};
       FIELDS.forEach(function (pair) {
@@ -513,6 +534,7 @@
       return body;
     }
 
+    // Highlight the preset chip that was clicked, or the one matching the motion.
     function markPreset() {
       const motion = (theme.motion || (field("motion") && field("motion").value) || "crawl");
       const aliases = {
@@ -549,6 +571,7 @@
       }).then(function (r) { return r.json(); });
     }
 
+    // Debounced (180 ms) live preview while typing / changing fields.
     function live() {
       clearTimeout(liveTimer);
       liveTimer = setTimeout(function () {
@@ -570,6 +593,7 @@
         markMotion();
         live();
         const k = el.getAttribute("data-k");
+        // These need the overlay to restart the motion to show the change.
         if (k === "motion" || k === "typewriter_unit" || k === "typewriter_cps" || k === "matrix_density") {
           restartPlay();
         }
@@ -581,6 +605,7 @@
       });
     });
 
+    // POST {restart: true}: bumps play.generation so overlays restart the roll.
     function restartPlay() {
       if (!opts.playUrl) return Promise.resolve();
       return fetch(withAuth(opts.playUrl), {

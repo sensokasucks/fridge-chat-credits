@@ -1,8 +1,14 @@
-"""Sanity checks for look sanitizer — run: python3 core/test_look.py"""
+"""Sanity checks for core/look.py's sanitizer — run: python3 core/test_look.py
+
+Guards that every motion the editor offers (overlay/credits-editor.js) survives
+sanitize_look / merge_look, so Matrix / Teletype presets don't fall back to a crawl.
+Run from the core/ folder or with core/ on the path (it imports ``look`` directly).
+"""
 
 from look import ALLOWED_MOTIONS, merge_look, sanitize_look
 
 
+# Tiny assert helper: exit with FAIL on the first broken check.
 def check(name, cond):
     if not cond:
         raise SystemExit(f"FAIL: {name}")

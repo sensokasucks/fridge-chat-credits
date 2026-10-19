@@ -1,4 +1,13 @@
-"""HTTP + WebSocket surface for the control desk and XSplit overlay."""
+"""HTTP + WebSocket surface for the control desk and XSplit overlay.
+
+create_app() builds the FastAPI app that main.py serves on 127.0.0.1:3854.
+- /api/*          JSON routes used by overlay/control.html (the desk).
+- /api/credits/*  aliases with the same contract as Stream Core's built-in credits,
+                  so overlay/credits.js works against either app.
+- /ws             pushes {"type": "theme" | "play" | "roster", "data": ...} to the
+                  overlay and desk; clients may send "ping" and get {"type": "pong"}.
+- /overlay/*      static files from overlay/; "/" is the desk, "/credits" the overlay.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +31,8 @@ log = logging.getLogger("api.server")
 
 
 class ConnectionManager:
+    """Tracks open /ws clients and sends JSON to all of them."""
+
     def __init__(self):
         self.active: Set[WebSocket] = set()
 
@@ -33,6 +44,7 @@ class ConnectionManager:
         self.active.discard(ws)
 
     async def broadcast(self, data: dict) -> None:
+        """Send ``data`` to every client; clients that fail are dropped."""
         dead = []
         for ws in list(self.active):
             try:
@@ -44,7 +56,13 @@ class ConnectionManager:
 
 
 class AppState:
-    """Filled by main.py."""
+    """Shared state between main.py and the routes (filled in by main.py).
+
+    ``theme`` is the live look dict (credits_theme.LOOK_DEFAULTS + config ``credits:``
+    + data/theme.json). ``play`` holds playback: playing, mode (loop/once/hold),
+    freeze (roster frozen for "Roll credits"), frozen_roster (the frozen snapshot,
+    never sent to clients), generation (bumped to make overlays restart the roll).
+    """
 
     def __init__(self):
         self.config: dict = {}
@@ -69,6 +87,7 @@ def _theme_path(state: AppState) -> Path:
 
 
 def load_theme(state: AppState) -> dict:
+    """Build state.theme: look defaults, then config.yaml ``credits:``, then data/theme.json."""
     theme = dict(LOOK_DEFAULTS)
     theme.update(state.config.get("credits") or {})
     path = _theme_path(state)
@@ -84,12 +103,15 @@ def load_theme(state: AppState) -> dict:
 
 
 def save_theme(state: AppState) -> None:
+    """Write the whole live look to data/theme.json (keeps config.yaml and its comments untouched)."""
     path = _theme_path(state)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state.theme, indent=2), encoding="utf-8")
 
 
 def roster_payload(state: AppState) -> dict:
+    """The roster dict the overlay draws: the frozen copy while frozen, else a fresh
+    snapshot sorted by the look's ``sort`` and decorated by the cast board."""
     sort = (state.theme or {}).get("sort") or "first_seen"
     if state.play.get("freeze") and state.play.get("frozen_roster"):
         snap = state.play["frozen_roster"]
@@ -105,6 +127,7 @@ def roster_payload(state: AppState) -> dict:
 
 def create_app(state: AppState) -> FastAPI:
     app = FastAPI(title="Fridge Chat Credits", version="1.0.0")
+    # Note: this allows any origin, and core/local_guard.py is not installed here.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -116,6 +139,7 @@ def create_app(state: AppState) -> FastAPI:
 
     overlay_dir = Path(__file__).resolve().parent.parent / "overlay"
 
+    # Overlay pages must never be cached, or XSplit/OBS keeps showing an old version.
     @app.middleware("http")
     async def no_cache_overlay(request, call_next):
         response = await call_next(request)
@@ -133,6 +157,7 @@ def create_app(state: AppState) -> FastAPI:
             "count": len(state.roster.chatters) if state.roster else 0,
         }
 
+    # ``play`` without the frozen roster copy (that is big and only used server-side).
     def _public_play():
         return {k: v for k, v in state.play.items() if k != "frozen_roster"}
 
@@ -144,11 +169,14 @@ def create_app(state: AppState) -> FastAPI:
             "note": "Saving platforms / ingest requires a restart of Chat Credits.",
         }
 
+    # Desk "Config.yaml" save: writes this app's config/config.yaml and hot-applies
+    # what it can via ChatCredits.apply_runtime_config (platform toggles need a restart).
     @app.put("/api/config")
     async def put_config(body: dict[str, Any]):
         incoming = body.get("config") if isinstance(body.get("config"), dict) else body
         if not isinstance(incoming, dict) or not incoming:
             return JSONResponse({"ok": False, "error": "config object required"}, status_code=400)
+        # The YAML is written whole, so a save without ``credits`` would drop the look.
         # Keep current look if the editor didn't send credits
         if "credits" not in incoming and state.theme:
             incoming = dict(incoming)
@@ -189,6 +217,7 @@ def create_app(state: AppState) -> FastAPI:
             headers={"Content-Disposition": "attachment; filename=chatters.csv"},
         )
 
+    # Desk "Reset session": empties the roster, unfreezes, and tells every overlay.
     @app.post("/api/session/reset")
     async def reset_session():
         state.roster.reset()
@@ -203,8 +232,11 @@ def create_app(state: AppState) -> FastAPI:
     async def get_theme():
         return state.theme
 
+    # Live look edits from the desk style editor; merged into state.theme and broadcast.
+    # Values are stored as sent (core/look.py's sanitizer is not applied here).
     @app.put("/api/theme")
     async def put_theme(body: dict[str, Any]):
+        # persist=false lets the editor preview a look live without saving it.
         persist = bool(body.pop("persist", True))
         body.pop("persist", None)
         if "style_id" in body and state.cast:
@@ -223,6 +255,8 @@ def create_app(state: AppState) -> FastAPI:
         out.pop("frozen_roster", None)
         return out
 
+    # Playback controls. Body keys (all optional): playing, mode, freeze, restart.
+    # freeze=true snapshots the roster now ("Roll credits"); false goes back to live.
     @app.post("/api/play")
     async def set_play(body: dict[str, Any]):
         if "playing" in body:
@@ -237,6 +271,7 @@ def create_app(state: AppState) -> FastAPI:
                 state.play["frozen_roster"] = roster_payload(state)
             else:
                 state.play["frozen_roster"] = None
+        # Overlays restart the roll from the bottom when ``generation`` changes.
         if body.get("restart"):
             state.play["generation"] = int(state.play.get("generation") or 0) + 1
         public = {k: v for k, v in state.play.items() if k != "frozen_roster"}
@@ -246,7 +281,10 @@ def create_app(state: AppState) -> FastAPI:
 
     @app.post("/api/seed")
     async def seed(body: dict[str, Any]):
-        """Add a test chatter without a live platform."""
+        """Add a test chatter without a live platform.
+
+        Body: {username or display_name, platform? (default manual), is_mod?, message?}.
+        """
         if not state.bus:
             return JSONResponse({"ok": False, "error": "bus not ready"}, status_code=503)
         name = (body.get("username") or body.get("display_name") or "").strip()
@@ -271,6 +309,7 @@ def create_app(state: AppState) -> FastAPI:
         ))
         return {"ok": True, "count": len(state.roster.chatters)}
 
+    # Cast styles (config/cast/*.json), the active one, and pinned jobs for the desk.
     @app.get("/api/cast")
     async def get_cast():
         board = state.cast
@@ -298,6 +337,7 @@ def create_app(state: AppState) -> FastAPI:
         await manager.broadcast({"type": "roster", "data": snap})
         return {"ok": True, "style_id": sid, "style": board.get_style()}
 
+    # Save a movie style posted by the desk's cast editor (see CastBoard.save_style).
     @app.put("/api/cast/file")
     async def put_cast_file(body: dict[str, Any]):
         board = state.cast
@@ -309,6 +349,8 @@ def create_app(state: AppState) -> FastAPI:
             return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
         return {"ok": True, "style": saved, "styles": board.list_styles()}
 
+    # Pin a job title to a chatter. Body: {username, platform (default twitch), job};
+    # job "clear" or clear=true removes the pin.
     @app.post("/api/cast/pin")
     async def pin_cast(body: dict[str, Any]):
         board = state.cast
@@ -328,6 +370,7 @@ def create_app(state: AppState) -> FastAPI:
         await manager.broadcast({"type": "roster", "data": snap})
         return {"ok": True, "overrides": list(board.overrides.values())}
 
+    # New clients get theme, play and roster at once, then only pushes after that.
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket):
         await manager.connect(ws)

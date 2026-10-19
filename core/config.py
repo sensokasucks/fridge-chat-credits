@@ -1,4 +1,10 @@
-"""Load config/config.yaml and merge with defaults."""
+"""Load config/config.yaml and merge it over the built-in DEFAULTS.
+
+main.py calls load_config() at start-up; the control desk's Config editor
+(PUT /api/config in api/server.py) calls save_config(). This is Chat Credits'
+own config file, not Stream Core's. The ``credits:`` look defaults come from
+core/credits_theme.py; live look edits are saved to data/theme.json instead.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +19,7 @@ from core.credits_theme import LOOK_DEFAULTS
 
 log = logging.getLogger("core.config")
 
+# Common chat bots that should never appear in the credits.
 DEFAULT_IGNORE = [
     "nightbot",
     "streamelements",
@@ -27,6 +34,7 @@ DEFAULT_IGNORE = [
     "own3d",
 ]
 
+# Every key the app reads, with its fallback value. Ports: Stream Core 3850, this app 3854.
 DEFAULTS: dict[str, Any] = {
     "app": {
         "host": "127.0.0.1",
@@ -68,6 +76,7 @@ DEFAULTS: dict[str, Any] = {
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge ``override`` into a copy of ``base`` (nested dicts merge, other values replace)."""
     out = copy.deepcopy(base)
     for key, value in (override or {}).items():
         if isinstance(value, dict) and isinstance(out.get(key), dict):
@@ -78,6 +87,12 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 def load_config(root: Path) -> dict:
+    """Return the merged config. Falls back to config.example.yaml, then to DEFAULTS.
+
+    If the YAML has tab indentation (common after editing in Notepad) or a BOM,
+    the leading tabs are turned into spaces and the file is rewritten, because
+    YAML does not allow tabs for indentation.
+    """
     path = root / "config" / "config.yaml"
     if not path.exists():
         example = root / "config" / "config.example.yaml"
@@ -123,6 +138,7 @@ def save_config(root: Path, data: dict) -> Path:
     merged = _deep_merge(DEFAULTS, data or {})
     path = root / "config" / "config.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Note: yaml.safe_dump drops any comments the user had in config.yaml.
     text = yaml.safe_dump(
         merged,
         default_flow_style=False,
