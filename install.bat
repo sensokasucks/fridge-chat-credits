@@ -1,13 +1,13 @@
 @echo off
 REM ============================================================
-REM Fridge Chat Credits – one-time install (Windows)
+REM Fridge Chat Credits - one-time install (Windows)
 REM Double-click this file inside fridge-chat-credits.
 REM ============================================================
 setlocal EnableExtensions
 cd /d "%~dp0"
 
 echo.
-echo === Fridge Chat Credits – install ===
+echo === Fridge Chat Credits - install ===
 echo.
 
 where py >nul 2>&1
@@ -64,7 +64,7 @@ if not exist "config\config.yaml" (
     copy /Y "config\config.example.yaml" "config\config.yaml" >nul
   )
 ) else (
-  echo config\config.yaml already present – leaving it alone
+  echo config\config.yaml already present - leaving it alone
 )
 
 if not exist "data" mkdir data
