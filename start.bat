@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM Fridge Chat Credits – start (from inside this folder)
+REM Fridge Chat Credits - start (from inside this folder)
 REM Double-click this every time you stream.
 REM ============================================================
 setlocal EnableExtensions
@@ -26,7 +26,7 @@ if not exist ".venv\Scripts\python.exe" (
 
 if not exist "config\config.yaml" (
   if exist "config\config.example.yaml" (
-    echo config\config.yaml missing – copying from example.
+    echo config\config.yaml missing - copying from example.
     copy /Y "config\config.example.yaml" "config\config.yaml" >nul
   )
 )
